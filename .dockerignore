@@ -1,0 +1,53 @@
+# Git
+.git
+.gitignore
+
+# Docker
+docker/
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Documentation
+*.md
+docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+testdata/
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Node modules (if any)
+node_modules/
+
+# Coverage files
+*.out
+coverage.html
+
+# Air live reload (if used)
+tmp/
