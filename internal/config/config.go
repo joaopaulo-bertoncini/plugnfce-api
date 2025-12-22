@@ -1,46 +1,50 @@
 package config
 
 import (
+	"fmt"
+
 	"github.com/joeshaw/envdecode"
 )
 
-// AppConfig holds all configuration for the application
 type AppConfig struct {
-	// Server configuration
-	Port string `env:"PORT,default=8080"`
+	Env        string `env:"ENV,default=development"`
+	Port       string `env:"HTTP_PORT,default=8080"`
+	AppName    string `env:"APP_NAME,default=ImobCheck API"`
+	AppVersion string `env:"APP_VERSION,default=1.0.0"`
 
 	// Database configuration
-	DatabaseURL string `env:"DATABASE_URL,required"`
-
-	// Queue configuration
-	RabbitMQURL string `env:"RABBITMQ_URL,default=amqp://guest:guest@localhost:5672/"`
-
-	// Storage configuration
-	StorageType     string `env:"STORAGE_TYPE,default=local"`
-	StorageBucket   string `env:"STORAGE_BUCKET,default=nfce"`
-	StorageBasePath string `env:"STORAGE_BASE_PATH,default=./storage"`
-
-	// S3/MinIO configuration
-	StorageEndpoint  string `env:"STORAGE_ENDPOINT"`
-	StorageAccessKey string `env:"STORAGE_ACCESS_KEY"`
-	StorageSecretKey string `env:"STORAGE_SECRET_KEY"`
-	StorageUseSSL    bool   `env:"STORAGE_USE_SSL,default=true"`
-	StoragePublicURL string `env:"STORAGE_PUBLIC_URL"`
+	DBHost     string `env:"DB_HOST,default=localhost"`
+	DBPort     string `env:"DB_PORT,default=5432"`
+	DBUser     string `env:"DB_USER,default=imobcheck"`
+	DBPassword string `env:"DB_PASSWORD,default=imobcheck"`
+	DBName     string `env:"DB_NAME,default=imobcheck"`
+	DBSSLMode  string `env:"DB_SSL_MODE,default=disable"`
 
 	// JWT configuration
-	JWTSecret string `env:"JWT_SECRET,required"`
-	JWTExpiry int    `env:"JWT_EXPIRY,default=24"`
+	JWTSecret string `env:"JWT_SECRET,default=your-super-secret-jwt-key-change-this-in-production"`
+	JWTExpiry int    `env:"JWT_EXPIRY,default=24"` // hours
 
-	// SEFAZ configuration
-	SEFAZTimeout int `env:"SEFAZ_TIMEOUT,default=30"`
+	// Storage configuration
+	StorageType      string `env:"STORAGE_TYPE,default=minio"`              // minio, local, or s3
+	StorageEndpoint  string `env:"STORAGE_ENDPOINT,default=localhost:9000"` // MinIO endpoint or S3 endpoint
+	StorageAccessKey string `env:"STORAGE_ACCESS_KEY,default=minioadmin"`
+	StorageSecretKey string `env:"STORAGE_SECRET_KEY,default=minioadmin"`
+	StorageBucket    string `env:"STORAGE_BUCKET,default=imobcheck-photos"`
+	StorageUseSSL    bool   `env:"STORAGE_USE_SSL,default=false"`
+	StorageBasePath  string `env:"STORAGE_BASE_PATH,default=./uploads"`                      // For local storage
+	StoragePublicURL string `env:"STORAGE_PUBLIC_URL,default=http://localhost:8080/uploads"` // For local storage
 
-	// Logging
-	LogLevel string `env:"LOG_LEVEL,default=info"`
+	RabbitMQURL string `env:"RABBITMQ_URL,default=amqp://guest:guest@localhost:5672/"`
 }
 
-// InitConfig initializes the application configuration from environment variables
-func InitConfig() (*AppConfig, error) {
-	var cfg AppConfig
-	err := envdecode.Decode(&cfg)
-	return &cfg, err
+func InitConfig() (cfg *AppConfig, err error) {
+	cfg = &AppConfig{}
+	err = envdecode.Decode(cfg)
+	return
+}
+
+// GetDatabaseDSN returns the database connection string
+func (c *AppConfig) GetDatabaseDSN() string {
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		c.DBHost, c.DBPort, c.DBUser, c.DBPassword, c.DBName, c.DBSSLMode)
 }

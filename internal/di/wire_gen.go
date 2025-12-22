@@ -10,19 +10,28 @@ import (
 	"context"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/usecase"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/config"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/service"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/database/postgres"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/http/handler"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/http/server"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/messaging/rabbitmq"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/nfce"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/qr"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/signer"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/soap/soapclient"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/validator"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/worker"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/pkg/database"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/pkg/logger"
 	"gorm.io/gorm"
+	"time"
 )
 
 // Injectors from wire.go:
 
 // InitializeAPI initializes the entire API application with dependency injection
 func InitializeAPI(ctx context.Context, cfg *config.AppConfig, l logger.Logger) (*server.Server, error) {
-	db, err := provideDatabase(ctx, cfg)
+	db, err := provideDatabase()
 	if err != nil {
 		return nil, err
 	}
@@ -52,11 +61,40 @@ func InitializeAPI(ctx context.Context, cfg *config.AppConfig, l logger.Logger) 
 	return serverServer, nil
 }
 
+// InitializeWorker initializes the worker with dependency injection
+func InitializeWorker(ctx context.Context, cfg *config.AppConfig, l logger.Logger) (*worker.Worker, error) {
+	db, err := provideDatabase()
+	if err != nil {
+		return nil, err
+	}
+	nfCeRepository := postgres.NewNFCeRepository(db)
+	publisher, err := providePublisher(cfg)
+	if err != nil {
+		return nil, err
+	}
+	consumer, err := provideConsumer(cfg)
+	if err != nil {
+		return nil, err
+	}
+	builder := provideXMLBuilder()
+	signer := provideXMLSigner()
+	xmlValidator, err := provideXMLValidator()
+	if err != nil {
+		return nil, err
+	}
+	client := provideSOAPClient()
+	generator := provideQRGenerator()
+	nfCeWorkerService := service.NewNFCeWorkerService(builder, signer, xmlValidator, client, generator)
+	int2 := provideMaxRetries()
+	workerWorker := worker.NewWorker(nfCeRepository, publisher, consumer, nfCeWorkerService, l, int2)
+	return workerWorker, nil
+}
+
 // wire.go:
 
 // provideDatabase provides database instance
-func provideDatabase(ctx context.Context, cfg *config.AppConfig) (*gorm.DB, error) {
-	return postgres.NewDatabase(ctx, cfg)
+func provideDatabase() (*gorm.DB, error) {
+	return database.GetDB(), nil
 }
 
 // providePublisher provides RabbitMQ publisher
@@ -67,4 +105,44 @@ func providePublisher(cfg *config.AppConfig) (rabbitmq.Publisher, error) {
 // providePort provides the server port
 func providePort(cfg *config.AppConfig) string {
 	return cfg.Port
+}
+
+// provideConsumer provides RabbitMQ consumer
+func provideConsumer(cfg *config.AppConfig) (rabbitmq.Consumer, error) {
+	return rabbitmq.NewConsumer(cfg.RabbitMQURL)
+}
+
+// provideXMLBuilder provides XML builder
+func provideXMLBuilder() nfe.Builder {
+	return nfe.NewBuilder()
+}
+
+// provideXMLSigner provides XML signer
+func provideXMLSigner() signer.Signer {
+	return signer.NewSigner()
+}
+
+// provideXMLValidator provides XML validator
+func provideXMLValidator() (validator.XMLValidator, error) {
+	return validator.NewXMLValidator("./internal/infrastructure/sefaz/schemas")
+}
+
+// provideSOAPClient provides SOAP client
+func provideSOAPClient() soapclient.Client {
+	return soapclient.NewSOAPClient(30 * time.Second)
+}
+
+// provideQRGenerator provides QR code generator
+func provideQRGenerator() qr.Generator {
+	return qr.NewGenerator()
+}
+
+// provideMaxRetries provides max retry count
+func provideMaxRetries() int {
+	return 5
+}
+
+// provideWorkerCount provides worker count
+func provideWorkerCount() int {
+	return 3
 }

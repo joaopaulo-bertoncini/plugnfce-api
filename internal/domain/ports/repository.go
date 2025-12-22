@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"time"
 
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/entity"
 )
@@ -50,6 +51,7 @@ type WebhookRepository interface {
 // NFCeRepository defines the persistence boundary for NFC-e requests.
 type NFCeRepository interface {
 	Create(ctx context.Context, req *entity.NFCE) error
+	Update(ctx context.Context, nfce *entity.NFCE) error
 	UpdateStatus(ctx context.Context, id string, from entity.RequestStatus, to entity.RequestStatus, mutate func(*entity.NFCE)) error
 	GetByID(ctx context.Context, id string) (*entity.NFCE, error)
 	GetByIdempotencyKey(ctx context.Context, key string) (*entity.NFCE, error)
@@ -58,7 +60,9 @@ type NFCeRepository interface {
 	Count(ctx context.Context) (int, error)
 	CountByStatus(ctx context.Context, status entity.RequestStatus) (int, error)
 	AppendEvent(ctx context.Context, evt *entity.Event) error
+	CreateEvent(ctx context.Context, event *entity.Event) error
 	GetEventsByRequestID(ctx context.Context, requestID string, limit, offset int) ([]*entity.Event, error)
+	GetPendingRetries(ctx context.Context, beforeTime time.Time, limit int) ([]*entity.NFCE, error)
 }
 
 // Tx defines the minimal transaction contract used by the service layer.

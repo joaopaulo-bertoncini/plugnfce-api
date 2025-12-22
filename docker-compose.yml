@@ -14,6 +14,11 @@ services:
       - db_data:/var/lib/postgresql/data
     networks:
       - plugnfce_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plugnfce -d plugnfce"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # MinIO - S3-compatible object storage for local development
   minio:
@@ -72,7 +77,7 @@ services:
       retries: 3
     command: redis-server --appendonly yes
 
-  api:
+   api:
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -80,21 +85,18 @@ services:
     ports:
       - "8080:8080"
     environment:
+      - APP_COMPONENT=api
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USER=plugnfce
       - DB_PASSWORD=plugnfce
       - DB_NAME=plugnfce
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
       - RABBITMQ_USER=guest
       - RABBITMQ_PASSWORD=guest
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - MINIO_BUCKET=plugnfce
+      - PORT=8080
+      - ENV=development
     depends_on:
       db:
         condition: service_healthy
@@ -102,12 +104,39 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     networks:
       - plugnfce_net
-    volumes:
-      - ../internal/infrastructure/sefaz/validator/schemas:/app/schemas
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: plugnfce_worker
+    environment:
+      - APP_COMPONENT=worker
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=plugnfce
+      - DB_PASSWORD=plugnfce
+      - DB_NAME=plugnfce
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+      - ENV=development
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      api:
+        condition: service_started
+    networks:
+      - plugnfce_net
+    restart: unless-stopped
 
 volumes:
   db_data:

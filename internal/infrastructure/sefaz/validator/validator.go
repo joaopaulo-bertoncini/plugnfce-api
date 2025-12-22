@@ -2,7 +2,7 @@
 //
 // Example usage:
 //
-//	validator, err := NewXMLValidator("./schemas")
+//	validator, err := NewXMLValidator("./internal/infrastructure/sefaz/schemas")
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -18,7 +18,6 @@
 //	if err := validator.ValidateNFCe(ctx, xmlData, "4.00"); err != nil {
 //		log.Printf("Validation failed: %v", err)
 //	}
-//
 package validator
 
 import (
@@ -145,17 +144,17 @@ func (v *xmlValidator) ValidateWithCustomSchema(ctx context.Context, xmlData []b
 func (v *xmlValidator) DownloadSEFAZSchemas(ctx context.Context, version string) error {
 	// NFC-e schemas required for version 4.00
 	schemas := map[string]string{
-		"nfe_v4.00.xsd": "http://www.portalfiscal.inf.br/nfe/xsd/nfe_v4.00.xsd",
-		"infNFe_v4.00.xsd": "http://www.portalfiscal.inf.br/nfe/xsd/infNFe_v4.00.xsd",
-		"infIntermed_v4.00.xsd": "http://www.portalfiscal.inf.br/nfe/xsd/infIntermed_v4.00.xsd",
-		"infRespTec_v4.00.xsd": "http://www.portalfiscal.inf.br/nfe/xsd/infRespTec_v4.00.xsd",
-		"infSolicNFF_v4.00.xsd": "http://www.portalfiscal.inf.br/nfe/xsd/infSolicNFF_v4.00.xsd",
-		"procNFe_v4.00.xsd": "http://www.portalfiscal.inf.br/nfe/xsd/procNFe_v4.00.xsd",
-		"retConsSitNFe_v4.00.xsd": "http://www.portalfiscal.inf.br/nfe/xsd/retConsSitNFe_v4.00.xsd",
+		"nfe_v4.00.xsd":             "http://www.portalfiscal.inf.br/nfe/xsd/nfe_v4.00.xsd",
+		"infNFe_v4.00.xsd":          "http://www.portalfiscal.inf.br/nfe/xsd/infNFe_v4.00.xsd",
+		"infIntermed_v4.00.xsd":     "http://www.portalfiscal.inf.br/nfe/xsd/infIntermed_v4.00.xsd",
+		"infRespTec_v4.00.xsd":      "http://www.portalfiscal.inf.br/nfe/xsd/infRespTec_v4.00.xsd",
+		"infSolicNFF_v4.00.xsd":     "http://www.portalfiscal.inf.br/nfe/xsd/infSolicNFF_v4.00.xsd",
+		"procNFe_v4.00.xsd":         "http://www.portalfiscal.inf.br/nfe/xsd/procNFe_v4.00.xsd",
+		"retConsSitNFe_v4.00.xsd":   "http://www.portalfiscal.inf.br/nfe/xsd/retConsSitNFe_v4.00.xsd",
 		"retConsStatServ_v4.00.xsd": "http://www.portalfiscal.inf.br/nfe/xsd/retConsStatServ_v4.00.xsd",
-		"retEnviNFe_v4.00.xsd": "http://www.portalfiscal.inf.br/nfe/xsd/retEnviNFe_v4.00.xsd",
-		"retInutNFe_v4.00.xsd": "http://www.portalfiscal.inf.br/nfe/xsd/retInutNFe_v4.00.xsd",
-		"tiposBasico_v4.00.xsd": "http://www.portalfiscal.inf.br/nfe/xsd/tiposBasico_v4.00.xsd",
+		"retEnviNFe_v4.00.xsd":      "http://www.portalfiscal.inf.br/nfe/xsd/retEnviNFe_v4.00.xsd",
+		"retInutNFe_v4.00.xsd":      "http://www.portalfiscal.inf.br/nfe/xsd/retInutNFe_v4.00.xsd",
+		"tiposBasico_v4.00.xsd":     "http://www.portalfiscal.inf.br/nfe/xsd/tiposBasico_v4.00.xsd",
 	}
 
 	// Download each schema

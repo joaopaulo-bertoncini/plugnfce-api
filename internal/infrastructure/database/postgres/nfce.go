@@ -20,12 +20,6 @@ func NewNFCeRepository(db *gorm.DB) ports.NFCeRepository {
 	return &nfceRepository{db: db}
 }
 
-// NewDatabase creates a new database instance
-func NewDatabase(ctx context.Context, cfg interface{}) (*gorm.DB, error) {
-	// TODO: Implement database initialization with proper config
-	return nil, nil
-}
-
 // Create creates a new NFC-e request
 func (r *nfceRepository) Create(ctx context.Context, req *entity.NFCE) error {
 	req.ID = uuid.New().String()
@@ -127,6 +121,29 @@ func (r *nfceRepository) CountByStatus(ctx context.Context, status entity.Reques
 	var count int64
 	err := r.db.WithContext(ctx).Model(&entity.NFCE{}).Where("status = ?", status).Count(&count).Error
 	return int(count), err
+}
+
+// Update updates an NFC-e request
+func (r *nfceRepository) Update(ctx context.Context, nfce *entity.NFCE) error {
+	nfce.UpdatedAt = time.Now()
+	return r.db.WithContext(ctx).Save(nfce).Error
+}
+
+// CreateEvent creates an event for NFC-e tracking (alias for AppendEvent)
+func (r *nfceRepository) CreateEvent(ctx context.Context, event *entity.Event) error {
+	return r.AppendEvent(ctx, event)
+}
+
+// GetPendingRetries gets NFC-e requests that are due for retry
+func (r *nfceRepository) GetPendingRetries(ctx context.Context, beforeTime time.Time, limit int) ([]*entity.NFCE, error) {
+	var requests []*entity.NFCE
+	err := r.db.WithContext(ctx).
+		Where("status = ? AND next_retry_at IS NOT NULL AND next_retry_at <= ?",
+			entity.RequestStatusRetrying, beforeTime).
+		Limit(limit).
+		Order("next_retry_at ASC").
+		Find(&requests).Error
+	return requests, err
 }
 
 // GetEventsByRequestID gets events for a specific NFC-e request
