@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/dto"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -15,7 +16,7 @@ type publisher struct {
 }
 
 // NewPublisher creates a new RabbitMQ publisher
-func NewPublisher(url string) (Publisher, error) {
+func NewPublisher(url string) (dto.Publisher, error) {
 	conn, err := amqp.Dial(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
@@ -79,7 +80,7 @@ func NewPublisher(url string) (Publisher, error) {
 }
 
 // PublishEmit publishes an NFC-e emission message
-func (p *publisher) PublishEmit(ctx context.Context, msg EmitMessage) error {
+func (p *publisher) PublishEmit(ctx context.Context, msg dto.EmitMessage) error {
 	body, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)

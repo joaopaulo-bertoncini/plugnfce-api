@@ -10,7 +10,6 @@ import (
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/mapper"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/entity"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/ports"
-	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/messaging/rabbitmq"
 )
 
 // NFCeUseCase defines the interface for NFC-e business logic
@@ -25,12 +24,12 @@ type NFCeUseCase interface {
 // nfceUseCase implements NFCeUseCase
 type nfceUseCase struct {
 	repo      ports.NFCeRepository
-	publisher rabbitmq.Publisher
+	publisher dto.Publisher
 	mapper    *mapper.NFceMapper
 }
 
 // NewNFCeUseCase creates a new NFCeUseCase
-func NewNFCeUseCase(repo ports.NFCeRepository, publisher rabbitmq.Publisher) NFCeUseCase {
+func NewNFCeUseCase(repo ports.NFCeRepository, publisher dto.Publisher) NFCeUseCase {
 	return &nfceUseCase{
 		repo:      repo,
 		publisher: publisher,
@@ -73,7 +72,7 @@ func (uc *nfceUseCase) EmitNFce(ctx context.Context, idempotencyKey string, req 
 	}
 
 	// Publish to queue for async processing
-	emitMsg := rabbitmq.EmitMessage{
+	emitMsg := dto.EmitMessage{
 		RequestID:      requestID,
 		IdempotencyKey: idempotencyKey,
 		Payload:        uc.mapper.ToEmitPayload(req),

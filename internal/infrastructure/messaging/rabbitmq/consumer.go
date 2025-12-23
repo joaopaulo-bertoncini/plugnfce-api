@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/dto"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -16,7 +17,7 @@ type consumer struct {
 }
 
 // NewConsumer creates a new RabbitMQ consumer
-func NewConsumer(url string) (Consumer, error) {
+func NewConsumer(url string) (dto.Consumer, error) {
 	conn, err := amqp.Dial(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
@@ -80,7 +81,7 @@ func NewConsumer(url string) (Consumer, error) {
 }
 
 // ConsumeEmit consumes NFC-e emission messages
-func (c *consumer) ConsumeEmit(ctx context.Context, handler func(context.Context, EmitMessage) error) error {
+func (c *consumer) ConsumeEmit(ctx context.Context, handler func(context.Context, dto.EmitMessage) error) error {
 	msgs, err := c.channel.Consume(
 		"nfce_emit_queue", // queue
 		"",                // consumer
@@ -104,7 +105,7 @@ func (c *consumer) ConsumeEmit(ctx context.Context, handler func(context.Context
 			}
 
 			// Parse message
-			var msg EmitMessage
+			var msg dto.EmitMessage
 			if err := json.Unmarshal(d.Body, &msg); err != nil {
 				log.Printf("Failed to unmarshal message: %v", err)
 				d.Nack(false, false) // Don't requeue invalid messages

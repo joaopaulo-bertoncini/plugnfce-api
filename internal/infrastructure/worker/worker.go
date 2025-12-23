@@ -6,18 +6,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/dto"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/entity"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/ports"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/service"
-	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/messaging/rabbitmq"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/pkg/logger"
 )
 
 // Worker processes NFC-e emission requests from the message queue
 type Worker struct {
 	repo          ports.NFCeRepository
-	publisher     rabbitmq.Publisher
-	consumer      rabbitmq.Consumer
+	publisher     dto.Publisher
+	consumer      dto.Consumer
 	workerService *service.NFCeWorkerService
 	logger        logger.Logger
 	maxRetries    int
@@ -28,8 +28,8 @@ type Worker struct {
 // NewWorker creates a new NFC-e worker
 func NewWorker(
 	repo ports.NFCeRepository,
-	publisher rabbitmq.Publisher,
-	consumer rabbitmq.Consumer,
+	publisher dto.Publisher,
+	consumer dto.Consumer,
 	workerService *service.NFCeWorkerService,
 	logger logger.Logger,
 	maxRetries int,
@@ -92,7 +92,7 @@ func (w *Worker) Stop(ctx context.Context) error {
 }
 
 // handleMessage processes a single message from the queue
-func (w *Worker) handleMessage(ctx context.Context, msg rabbitmq.EmitMessage) error {
+func (w *Worker) handleMessage(ctx context.Context, msg dto.EmitMessage) error {
 	w.logger.Info("Processing NFC-e emission request",
 		logger.Field{Key: "request_id", Value: msg.RequestID},
 		logger.Field{Key: "idempotency_key", Value: msg.IdempotencyKey})
@@ -149,7 +149,7 @@ func (w *Worker) handleMessage(ctx context.Context, msg rabbitmq.EmitMessage) er
 }
 
 // processMessage processes a single NFC-e emission message
-func (w *Worker) processMessage(ctx context.Context, msg rabbitmq.EmitMessage, log logger.Logger) error {
+func (w *Worker) processMessage(ctx context.Context, msg dto.EmitMessage, log logger.Logger) error {
 	w.logger.Info("Processing NFC-e emission request",
 		logger.Field{Key: "request_id", Value: msg.RequestID},
 		logger.Field{Key: "idempotency_key", Value: msg.IdempotencyKey})
@@ -284,7 +284,7 @@ func (w *Worker) processPendingRetries(ctx context.Context) error {
 		}
 
 		// Publish to queue for immediate processing
-		emitMsg := rabbitmq.EmitMessage{
+		emitMsg := dto.EmitMessage{
 			RequestID:      req.ID,
 			IdempotencyKey: req.IdempotencyKey,
 			Payload:        req.Payload,

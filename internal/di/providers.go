@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/dto"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/usecase"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/config"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/service"
@@ -38,10 +39,11 @@ func InitializeAPIManual(ctx context.Context, cfg *config.AppConfig, l logger.Lo
 	webhookRepo := postgres.NewWebhookRepository(db)
 
 	// Initialize publisher
-	publisher, err := rabbitmq.NewPublisher(cfg.RabbitMQURL)
+	rabbitmqPublisher, err := rabbitmq.NewPublisher(cfg.RabbitMQURL)
 	if err != nil {
 		return nil, err
 	}
+	publisher := dto.Publisher(rabbitmqPublisher)
 
 	// Initialize use cases
 	nfceUseCase := usecase.NewNFCeUseCase(nfceRepo, publisher)
@@ -87,15 +89,17 @@ func InitializeWorkerManual(ctx context.Context, cfg *config.AppConfig, l logger
 	nfceRepo := postgres.NewNFCeRepository(db)
 
 	// Initialize messaging
-	publisher, err := rabbitmq.NewPublisher(cfg.RabbitMQURL)
+	rabbitmqPublisher, err := rabbitmq.NewPublisher(cfg.RabbitMQURL)
 	if err != nil {
 		return nil, err
 	}
+	publisher := dto.Publisher(rabbitmqPublisher)
 
-	consumer, err := rabbitmq.NewConsumer(cfg.RabbitMQURL)
+	rabbitmqConsumer, err := rabbitmq.NewConsumer(cfg.RabbitMQURL)
 	if err != nil {
 		return nil, err
 	}
+	consumer := dto.Consumer(rabbitmqConsumer)
 
 	// Initialize SEFAZ components
 	xmlBuilder := nfceInfra.NewBuilder()

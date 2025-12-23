@@ -77,7 +77,7 @@ services:
       retries: 3
     command: redis-server --appendonly yes
 
-   api:
+  api:
     build:
       context: ..
       dockerfile: docker/Dockerfile

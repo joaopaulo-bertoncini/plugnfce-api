@@ -8,6 +8,7 @@ package di
 
 import (
 	"context"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/dto"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/usecase"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/config"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/service"
@@ -98,8 +99,12 @@ func provideDatabase() (*gorm.DB, error) {
 }
 
 // providePublisher provides RabbitMQ publisher
-func providePublisher(cfg *config.AppConfig) (rabbitmq.Publisher, error) {
-	return rabbitmq.NewPublisher(cfg.RabbitMQURL)
+func providePublisher(cfg *config.AppConfig) (dto.Publisher, error) {
+	publisher, err := rabbitmq.NewPublisher(cfg.RabbitMQURL)
+	if err != nil {
+		return nil, err
+	}
+	return dto.Publisher(publisher), nil
 }
 
 // providePort provides the server port
@@ -108,8 +113,12 @@ func providePort(cfg *config.AppConfig) string {
 }
 
 // provideConsumer provides RabbitMQ consumer
-func provideConsumer(cfg *config.AppConfig) (rabbitmq.Consumer, error) {
-	return rabbitmq.NewConsumer(cfg.RabbitMQURL)
+func provideConsumer(cfg *config.AppConfig) (dto.Consumer, error) {
+	consumer, err := rabbitmq.NewConsumer(cfg.RabbitMQURL)
+	if err != nil {
+		return nil, err
+	}
+	return dto.Consumer(consumer), nil
 }
 
 // provideXMLBuilder provides XML builder
