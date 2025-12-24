@@ -3,17 +3,15 @@ package dto
 import (
 	"context"
 	"time"
-
-	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/entity"
 )
 
 // EmitMessage is the payload published to the queue for NFC-e emission.
+// Contains only the request ID for efficiency - worker fetches full data from database.
 type EmitMessage struct {
-	RequestID      string             `json:"request_id"`
-	IdempotencyKey string             `json:"idempotency_key"`
-	Payload        entity.EmitPayload `json:"payload"`
-	RetryCount     int                `json:"retry_count,omitempty"`
-	EnqueuedAt     time.Time          `json:"enqueued_at"`
+	RequestID      string    `json:"request_id"`
+	IdempotencyKey string    `json:"idempotency_key"`
+	RetryCount     int       `json:"retry_count,omitempty"`
+	EnqueuedAt     time.Time `json:"enqueued_at"`
 }
 
 // Publisher abstracts the message bus used by the API.

@@ -75,7 +75,6 @@ func (uc *nfceUseCase) EmitNFce(ctx context.Context, idempotencyKey string, req 
 	emitMsg := dto.EmitMessage{
 		RequestID:      requestID,
 		IdempotencyKey: idempotencyKey,
-		Payload:        uc.mapper.ToEmitPayload(req),
 		EnqueuedAt:     nfceRequest.CreatedAt,
 	}
 

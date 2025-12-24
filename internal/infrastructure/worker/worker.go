@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -220,34 +221,52 @@ func (w *Worker) scheduleRetry(ctx context.Context, nfceRequest *entity.NFCE) {
 	w.logger.Info("Scheduled retry",
 		logger.Field{Key: "request_id", Value: nfceRequest.ID},
 		logger.Field{Key: "retry_count", Value: nfceRequest.RetryCount},
-		logger.Field{Key: "next_retry_at", Value: nextRetryAt})
+		logger.Field{Key: "delay_duration", Value: delay.String()},
+		logger.Field{Key: "next_retry_at", Value: nextRetryAt},
+		logger.Field{Key: "created_at", Value: nfceRequest.CreatedAt})
 }
 
-// calculateBackoffDelay calculates exponential backoff delay
+// calculateBackoffDelay calculates exponential backoff delay with jitter
 func (w *Worker) calculateBackoffDelay(retryCount int) time.Duration {
-	// Base delays: 1m, 5m, 15m, 1h, 6h, 24h
-	baseDelays := []time.Duration{
-		time.Minute,
-		5 * time.Minute,
-		15 * time.Minute,
-		time.Hour,
-		6 * time.Hour,
-		24 * time.Hour,
+	// Base delay: 1 minute
+	baseDelay := time.Minute
+
+	// Exponential backoff: baseDelay * 2^(retryCount-1)
+	// Cap at 24 hours
+	exponent := uint(retryCount - 1)
+	if exponent > 10 { // Prevent overflow, 2^10 = 1024 minutes ≈ 17 hours
+		exponent = 10
+	}
+	multiplier := 1 << exponent // Bit shift on int
+	exponentialDelay := time.Duration(float64(baseDelay) * float64(multiplier))
+	if exponentialDelay > 24*time.Hour {
+		exponentialDelay = 24 * time.Hour
 	}
 
-	if retryCount <= len(baseDelays) {
-		return baseDelays[retryCount-1]
+	// Add jitter (±25%) to avoid thundering herd
+	jitter := time.Duration(float64(exponentialDelay) * 0.25 * (2*w.getRandomFloat() - 1))
+	delay := exponentialDelay + jitter
+
+	// Ensure minimum delay of 30 seconds
+	if delay < 30*time.Second {
+		delay = 30 * time.Second
 	}
 
-	// Max delay of 24 hours for retries beyond the base schedule
-	return 24 * time.Hour
+	return delay
+}
+
+// getRandomFloat returns a random float between 0 and 1
+func (w *Worker) getRandomFloat() float64 {
+	// Use seeded random for jitter
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return r.Float64() // Returns [0.0, 1.0)
 }
 
 // scheduleRetries periodically checks for and processes retry requests
 func (w *Worker) scheduleRetries(ctx context.Context) {
 	defer w.wg.Done()
 
-	ticker := time.NewTicker(30 * time.Second) // Check every 30 seconds
+	ticker := time.NewTicker(15 * time.Second) // Check every 15 seconds for faster retries
 	defer ticker.Stop()
 
 	for {
@@ -287,7 +306,6 @@ func (w *Worker) processPendingRetries(ctx context.Context) error {
 		emitMsg := dto.EmitMessage{
 			RequestID:      req.ID,
 			IdempotencyKey: req.IdempotencyKey,
-			Payload:        req.Payload,
 			EnqueuedAt:     time.Now(),
 		}
 

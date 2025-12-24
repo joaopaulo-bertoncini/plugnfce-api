@@ -52,11 +52,13 @@ type WebhookRepository interface {
 type NFCeRepository interface {
 	Create(ctx context.Context, req *entity.NFCE) error
 	Update(ctx context.Context, nfce *entity.NFCE) error
+	UpdateFields(ctx context.Context, id string, updates map[string]interface{}) error
 	UpdateStatus(ctx context.Context, id string, from entity.RequestStatus, to entity.RequestStatus, mutate func(*entity.NFCE)) error
 	GetByID(ctx context.Context, id string) (*entity.NFCE, error)
 	GetByIdempotencyKey(ctx context.Context, key string) (*entity.NFCE, error)
 	List(ctx context.Context, limit, offset int) ([]*entity.NFCE, error)
 	ListWithFilters(ctx context.Context, limit, offset int, companyID, status string) ([]*entity.NFCE, int, error)
+	GetStats(ctx context.Context, companyID string, since time.Time) (map[string]int, error)
 	Count(ctx context.Context) (int, error)
 	CountByStatus(ctx context.Context, status entity.RequestStatus) (int, error)
 	AppendEvent(ctx context.Context, evt *entity.Event) error

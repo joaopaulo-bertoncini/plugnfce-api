@@ -192,9 +192,23 @@ func (n *NFCE) IncrementRetry() {
 
 // CanRetry checks if the NFC-e can be retried
 func (n *NFCE) CanRetry(maxRetries int) bool {
-	return n.Status != RequestStatusAuthorized &&
-		n.Status != RequestStatusCanceled &&
-		n.RetryCount < maxRetries
+	// Don't retry if already successful or canceled
+	if n.Status == RequestStatusAuthorized || n.Status == RequestStatusCanceled {
+		return false
+	}
+
+	// Don't retry if exceeded max attempts
+	if n.RetryCount >= maxRetries {
+		return false
+	}
+
+	// Don't retry if more than 48 hours have passed since creation
+	maxAge := 48 * time.Hour
+	if time.Since(n.CreatedAt) > maxAge {
+		return false
+	}
+
+	return true
 }
 
 // SetStorageURLs sets the URLs for stored documents
