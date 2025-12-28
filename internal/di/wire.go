@@ -5,6 +5,7 @@ package di
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/wire"
@@ -21,6 +22,7 @@ import (
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/signer"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/soap/soapclient"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/validator"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/storage"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/worker"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/pkg/database"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/pkg/logger"
@@ -42,6 +44,7 @@ func InitializeAPI(ctx context.Context, cfg *config.AppConfig, l logger.Logger) 
 		server.NewServer,
 
 		// Application
+		provideStorage,
 		usecase.NewNFCeUseCase,
 		usecase.NewAdminUseCase,
 		usecase.NewCompanyUseCase,
@@ -73,6 +76,7 @@ func InitializeWorker(ctx context.Context, cfg *config.AppConfig, l logger.Logge
 		provideXMLValidator,
 		provideSOAPClient,
 		provideQRGenerator,
+		provideStorage,
 		service.NewNFCeWorkerService,
 		worker.NewWorker,
 		provideMaxRetries,
@@ -81,7 +85,14 @@ func InitializeWorker(ctx context.Context, cfg *config.AppConfig, l logger.Logge
 }
 
 // provideDatabase provides database instance
-func provideDatabase() (*gorm.DB, error) {
+func provideDatabase(cfg *config.AppConfig) (*gorm.DB, error) {
+	// Initialize database if not already initialized
+	if database.GetDB() == nil {
+		ctx := context.Background()
+		if err := database.InitDatabase(ctx, cfg.GetDatabaseDSN(), cfg.Env); err != nil {
+			return nil, fmt.Errorf("failed to initialize database: %w", err)
+		}
+	}
 	return database.GetDB(), nil
 }
 
@@ -109,8 +120,9 @@ func provideConsumer(cfg *config.AppConfig) (dto.Consumer, error) {
 }
 
 // provideXMLBuilder provides XML builder
-func provideXMLBuilder() nfceInfra.Builder {
-	return nfceInfra.NewBuilder()
+func provideXMLBuilder(db *gorm.DB) nfceInfra.Builder {
+	companyRepo := postgres.NewCompanyRepository(db)
+	return nfceInfra.NewBuilder(companyRepo)
 }
 
 // provideXMLSigner provides XML signer
@@ -141,4 +153,30 @@ func provideMaxRetries() int {
 // provideWorkerCount provides worker count
 func provideWorkerCount() int {
 	return 3
+}
+
+// provideStorage provides storage service
+func provideStorage(cfg *config.AppConfig) (storage.StorageService, error) {
+	switch cfg.StorageType {
+	case "minio":
+		return storage.NewMinIOStorage(
+			cfg.StorageEndpoint,
+			cfg.StorageAccessKey,
+			cfg.StorageSecretKey,
+			cfg.StorageBucket,
+			cfg.StorageUseSSL,
+		)
+	case "local":
+		return storage.NewLocalStorage(
+			cfg.StorageBasePath,
+			cfg.StoragePublicURL,
+			cfg.StorageBucket,
+		)
+	default:
+		return storage.NewLocalStorage(
+			cfg.StorageBasePath,
+			cfg.StoragePublicURL,
+			cfg.StorageBucket,
+		)
+	}
 }

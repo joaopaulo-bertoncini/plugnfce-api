@@ -8,6 +8,7 @@ package di
 
 import (
 	"context"
+	"fmt"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/dto"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/usecase"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/config"
@@ -21,6 +22,7 @@ import (
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/signer"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/soap/soapclient"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/validator"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/storage"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/worker"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/pkg/database"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/pkg/logger"
@@ -32,7 +34,7 @@ import (
 
 // InitializeAPI initializes the entire API application with dependency injection
 func InitializeAPI(ctx context.Context, cfg *config.AppConfig, l logger.Logger) (*server.Server, error) {
-	db, err := provideDatabase()
+	db, err := provideDatabase(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +43,11 @@ func InitializeAPI(ctx context.Context, cfg *config.AppConfig, l logger.Logger) 
 	if err != nil {
 		return nil, err
 	}
-	nfCeUseCase := usecase.NewNFCeUseCase(nfCeRepository, publisher)
+	storageService, err := provideStorage(cfg)
+	if err != nil {
+		return nil, err
+	}
+	nfCeUseCase := usecase.NewNFCeUseCase(nfCeRepository, publisher, storageService)
 	nfCeHandler := handler.NewNFCeHandler(nfCeUseCase)
 	companyRepository := postgres.NewCompanyRepository(db)
 	planRepository := postgres.NewPlanRepository(db)
@@ -64,7 +70,7 @@ func InitializeAPI(ctx context.Context, cfg *config.AppConfig, l logger.Logger) 
 
 // InitializeWorker initializes the worker with dependency injection
 func InitializeWorker(ctx context.Context, cfg *config.AppConfig, l logger.Logger) (*worker.Worker, error) {
-	db, err := provideDatabase()
+	db, err := provideDatabase(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +83,7 @@ func InitializeWorker(ctx context.Context, cfg *config.AppConfig, l logger.Logge
 	if err != nil {
 		return nil, err
 	}
-	builder := provideXMLBuilder()
+	builder := provideXMLBuilder(db)
 	signer := provideXMLSigner()
 	xmlValidator, err := provideXMLValidator()
 	if err != nil {
@@ -85,7 +91,11 @@ func InitializeWorker(ctx context.Context, cfg *config.AppConfig, l logger.Logge
 	}
 	client := provideSOAPClient()
 	generator := provideQRGenerator()
-	nfCeWorkerService := service.NewNFCeWorkerService(builder, signer, xmlValidator, client, generator)
+	storageService, err := provideStorage(cfg)
+	if err != nil {
+		return nil, err
+	}
+	nfCeWorkerService := service.NewNFCeWorkerService(builder, signer, xmlValidator, client, generator, storageService)
 	int2 := provideMaxRetries()
 	workerWorker := worker.NewWorker(nfCeRepository, publisher, consumer, nfCeWorkerService, l, int2)
 	return workerWorker, nil
@@ -94,7 +104,14 @@ func InitializeWorker(ctx context.Context, cfg *config.AppConfig, l logger.Logge
 // wire.go:
 
 // provideDatabase provides database instance
-func provideDatabase() (*gorm.DB, error) {
+func provideDatabase(cfg *config.AppConfig) (*gorm.DB, error) {
+
+	if database.GetDB() == nil {
+		ctx := context.Background()
+		if err := database.InitDatabase(ctx, cfg.GetDatabaseDSN(), cfg.Env); err != nil {
+			return nil, fmt.Errorf("failed to initialize database: %w", err)
+		}
+	}
 	return database.GetDB(), nil
 }
 
@@ -122,8 +139,9 @@ func provideConsumer(cfg *config.AppConfig) (dto.Consumer, error) {
 }
 
 // provideXMLBuilder provides XML builder
-func provideXMLBuilder() nfe.Builder {
-	return nfe.NewBuilder()
+func provideXMLBuilder(db *gorm.DB) nfe.Builder {
+	companyRepo := postgres.NewCompanyRepository(db)
+	return nfe.NewBuilder(companyRepo)
 }
 
 // provideXMLSigner provides XML signer
@@ -154,4 +172,30 @@ func provideMaxRetries() int {
 // provideWorkerCount provides worker count
 func provideWorkerCount() int {
 	return 3
+}
+
+// provideStorage provides storage service
+func provideStorage(cfg *config.AppConfig) (storage.StorageService, error) {
+	switch cfg.StorageType {
+	case "minio":
+		return storage.NewMinIOStorage(
+			cfg.StorageEndpoint,
+			cfg.StorageAccessKey,
+			cfg.StorageSecretKey,
+			cfg.StorageBucket,
+			cfg.StorageUseSSL,
+		)
+	case "local":
+		return storage.NewLocalStorage(
+			cfg.StorageBasePath,
+			cfg.StoragePublicURL,
+			cfg.StorageBucket,
+		)
+	default:
+		return storage.NewLocalStorage(
+			cfg.StorageBasePath,
+			cfg.StoragePublicURL,
+			cfg.StorageBucket,
+		)
+	}
 }

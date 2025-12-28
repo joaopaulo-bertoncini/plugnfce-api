@@ -23,9 +23,14 @@ func NewNFCeRepository(db *gorm.DB) ports.NFCeRepository {
 // Create creates a new NFC-e request
 func (r *nfceRepository) Create(ctx context.Context, req *entity.NFCE) error {
 	req.ID = uuid.New().String()
+	// Set default company ID if not provided (temporary until company management is implemented)
+	if req.CompanyID == "" {
+		req.CompanyID = "550e8400-e29b-41d4-a716-446655440000" // Default company UUID
+	}
 	req.CreatedAt = time.Now()
 	req.UpdatedAt = time.Now()
-	return r.db.WithContext(ctx).Create(req).Error
+	// Omit associations to prevent GORM from trying to resolve Events relationship
+	return r.db.WithContext(ctx).Omit("Events").Create(req).Error
 }
 
 // UpdateStatus updates the status of an NFC-e request
@@ -74,6 +79,7 @@ func (r *nfceRepository) GetByID(ctx context.Context, id string) (*entity.NFCE, 
 func (r *nfceRepository) GetByIdempotencyKey(ctx context.Context, key string) (*entity.NFCE, error) {
 	var req entity.NFCE
 	err := r.db.WithContext(ctx).
+		Omit("Events"). // Prevent GORM from trying to load Events association
 		Where("idempotency_key = ?", key).
 		Order("created_at DESC"). // Get the most recent if duplicates (though UNIQUE constraint prevents this)
 		First(&req).Error
@@ -206,6 +212,7 @@ func (r *nfceRepository) CreateEvent(ctx context.Context, event *entity.Event) e
 func (r *nfceRepository) GetPendingRetries(ctx context.Context, beforeTime time.Time, limit int) ([]*entity.NFCE, error) {
 	var requests []*entity.NFCE
 	err := r.db.WithContext(ctx).
+		Omit("Events"). // Prevent GORM from trying to load Events association
 		Where("status = ? AND next_retry_at IS NOT NULL AND next_retry_at <= ?",
 			entity.RequestStatusRetrying, beforeTime).
 		Limit(limit).

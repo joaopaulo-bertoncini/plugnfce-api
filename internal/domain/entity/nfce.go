@@ -1,6 +1,8 @@
 package entity
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -77,6 +79,25 @@ type EmitPayload struct {
 	Options     EmitOptions `json:"options"`
 }
 
+// Value implements the driver.Valuer interface for GORM JSONB serialization
+func (e EmitPayload) Value() (driver.Value, error) {
+	return json.Marshal(e)
+}
+
+// Scan implements the sql.Scanner interface for GORM JSONB deserialization
+func (e *EmitPayload) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("EmitPayload.Scan: value must be []byte")
+	}
+
+	return json.Unmarshal(bytes, e)
+}
+
 // NFCE represents an NFC-e document and its processing state
 type NFCE struct {
 	ID             string        `json:"id"`
@@ -85,7 +106,7 @@ type NFCE struct {
 	Status         RequestStatus `json:"status"`
 
 	// NFC-e data
-	Payload EmitPayload `json:"payload"`
+	Payload EmitPayload `json:"payload" gorm:"type:jsonb"`
 
 	// SEFAZ response data
 	ChaveAcesso string `json:"chave_acesso,omitempty"`
@@ -94,10 +115,10 @@ type NFCE struct {
 	Serie       string `json:"serie,omitempty"`  // NFC-e series
 
 	// Error handling
-	RejectionCode string `json:"rejection_code,omitempty"`
-	RejectionMsg  string `json:"rejection_msg,omitempty"`
-	CStat         string `json:"cstat,omitempty"`   // SEFAZ status code
-	XMotivo       string `json:"xmotivo,omitempty"` // SEFAZ status message
+	RejectionCode string `json:"rejection_code,omitempty" gorm:"column:rejection_code"`
+	RejectionMsg  string `json:"rejection_msg,omitempty" gorm:"column:rejection_msg"`
+	CStat         string `json:"cstat,omitempty" gorm:"column:cstat"`     // SEFAZ status code
+	XMotivo       string `json:"xmotivo,omitempty" gorm:"column:xmotivo"` // SEFAZ status message
 
 	// Processing metadata
 	RetryCount   int        `json:"retry_count,omitempty"`
@@ -110,16 +131,16 @@ type NFCE struct {
 	ContingencyType string `json:"contingency_type,omitempty"` // SVC-AN, SVC-RS
 
 	// Storage references
-	XMLURL    string `json:"xml_url,omitempty"`    // S3 URL for XML
-	PDFURL    string `json:"pdf_url,omitempty"`    // S3 URL for DANFE
-	QRCodeURL string `json:"qrcode_url,omitempty"` // QR Code image URL
+	XMLURL    string `json:"xml_url,omitempty" gorm:"column:xml_url"`       // S3 URL for XML
+	PDFURL    string `json:"pdf_url,omitempty" gorm:"column:pdf_url"`       // S3 URL for DANFE
+	QRCodeURL string `json:"qrcode_url,omitempty" gorm:"column:qrcode_url"` // QR Code image URL
+
+	// Relationships (not serialized to JSON)
+	Events []Event `json:"-" gorm:"foreignKey:RequestID;references:ID"`
 
 	// Timestamps
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-
-	// Relations (populated when needed)
-	Events []*Event `json:"events,omitempty"`
 }
 
 // NewNFCE creates a new NFC-e request
@@ -221,14 +242,19 @@ func (n *NFCE) SetStorageURLs(xmlURL, pdfURL, qrCodeURL string) {
 
 // Event captures status transitions for auditability and observability.
 type Event struct {
-	ID         string         `json:"id"`
-	RequestID  string         `json:"request_id"`
-	StatusFrom RequestStatus  `json:"status_from"`
-	StatusTo   RequestStatus  `json:"status_to"`
-	CStat      string         `json:"cstat,omitempty"`
-	Message    string         `json:"message,omitempty"`
-	Metadata   map[string]any `json:"metadata,omitempty"`
-	CreatedAt  time.Time      `json:"created_at"`
+	ID         string                 `json:"id" gorm:"type:varchar(36);primaryKey"`
+	RequestID  string                 `json:"request_id" gorm:"type:varchar(36);index"`
+	StatusFrom RequestStatus          `json:"status_from" gorm:"type:varchar(20)"`
+	StatusTo   RequestStatus          `json:"status_to" gorm:"type:varchar(20)"`
+	CStat      string                 `json:"cstat,omitempty" gorm:"type:varchar(10)"`
+	Message    string                 `json:"message,omitempty" gorm:"type:text"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty" gorm:"type:jsonb"`
+	CreatedAt  time.Time              `json:"created_at" gorm:"autoCreateTime"`
+}
+
+// TableName specifies the table name for GORM
+func (NFCE) TableName() string {
+	return "nfce_requests"
 }
 
 // Request represents an NFC-e emission request (alias for NFCE for backward compatibility)

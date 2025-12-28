@@ -16,6 +16,10 @@ type CompanyRepository interface {
 	List(ctx context.Context, limit, offset int) ([]*entity.Company, int, error)
 	Count(ctx context.Context) (int, error)
 	CountByStatus(ctx context.Context, status entity.CompanyStatus) (int, error)
+
+	// NFC-e sequencing methods
+	GetNextNFCeNumber(ctx context.Context, companyID string) (int64, error)
+	UpdateNFCeSequence(ctx context.Context, companyID string, lastNumber int64) error
 }
 
 // PlanRepository defines the persistence boundary for plans.

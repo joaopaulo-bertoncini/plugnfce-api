@@ -112,14 +112,24 @@ func (w *Worker) handleMessage(ctx context.Context, msg dto.EmitMessage) error {
 
 	// Process the NFC-e emission
 	if err := w.workerService.ProcessNFceEmission(ctx, nfceRequest); err != nil {
-		w.logger.Error("NFC-e emission failed", logger.Field{Key: "error", Value: err.Error()})
+		w.logger.Error("NFC-e emission failed",
+			logger.Field{Key: "error", Value: err.Error()},
+			logger.Field{Key: "request_id", Value: nfceRequest.ID})
 
-		// Check if we can retry
-		if w.workerService.CanRetry(nfceRequest, w.maxRetries) {
-			w.scheduleRetry(ctx, nfceRequest)
+		// Check if the error indicates the request was already marked as rejected
+		if nfceRequest.Status == entity.RequestStatusRejected {
+			// Request was marked as rejected due to non-retryable error
+			w.logger.Info("NFC-e rejected due to non-retryable error",
+				logger.Field{Key: "cstat", Value: nfceRequest.CStat},
+				logger.Field{Key: "motivo", Value: nfceRequest.XMotivo})
 		} else {
-			// Mark as rejected if max retries exceeded
-			nfceRequest.MarkAsRejected("999", "Número máximo de tentativas excedido")
+			// Check if we can retry based on retry count and error type
+			if w.workerService.CanRetry(nfceRequest, w.maxRetries) {
+				w.scheduleRetry(ctx, nfceRequest)
+			} else {
+				// Mark as rejected if max retries exceeded
+				nfceRequest.MarkAsRejected("999", "Número máximo de tentativas excedido")
+			}
 		}
 	}
 

@@ -45,7 +45,9 @@ type Company struct {
 	Certificado       DigitalCertificate `json:"certificado"`
 	CSC               CSCConfig          `json:"csc"`
 	RegimeTributario  TaxRegime          `json:"regime_tributario"`
-	SerieNFCe         string             `json:"serie_nfce"` // Série padrão para NFC-e
+	SerieNFCe         string             `json:"serie_nfce"`         // Série padrão para NFC-e
+	UltimoNumeroNFCe  int64              `json:"ultimo_numero_nfce"` // Último número sequencial usado
+	SerieAtualNFCe    string             `json:"serie_atual_nfce"`   // Série atual da NFC-e
 	Status            CompanyStatus      `json:"status"`
 	CreatedAt         time.Time          `json:"created_at"`
 	UpdatedAt         time.Time          `json:"updated_at"`

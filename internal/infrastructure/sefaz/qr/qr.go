@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/skip2/go-qrcode"
 )
 
 // Params holds the data required to assemble the NFC-e QR Code v3 URL.
@@ -21,11 +23,13 @@ type Params struct {
 	CSCID        string
 	CSCToken     string
 	UF           string
+	Contingency  bool // Whether this is a contingency NFC-e
 }
 
 // Generator builds the URL (and optionally image) for NFC-e QR Code v3.
 type Generator interface {
 	BuildURL(ctx context.Context, params Params) (string, error)
+	BuildImage(ctx context.Context, params Params, size int) ([]byte, error)
 }
 
 // generator implements Generator interface
@@ -53,6 +57,27 @@ func (g *generator) BuildURL(ctx context.Context, params Params) (string, error)
 	qrURL := g.buildQRURL(params, hash)
 
 	return qrURL, nil
+}
+
+// BuildImage generates a QR Code image as PNG bytes
+func (g *generator) BuildImage(ctx context.Context, params Params, size int) ([]byte, error) {
+	// Get the URL first
+	url, err := g.BuildURL(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build QR URL: %w", err)
+	}
+
+	// Generate QR code image
+	if size <= 0 {
+		size = 256 // Default size
+	}
+
+	qrCode, err := qrcode.Encode(url, qrcode.Medium, size)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate QR code image: %w", err)
+	}
+
+	return qrCode, nil
 }
 
 // validateParams validates the required parameters
@@ -141,6 +166,13 @@ func (g *generator) buildQRURL(params Params, hash string) string {
 		baseURL = "https://www.nfce.fazenda.sp.gov.br/qrcode"
 	}
 
+	// For contingency, use contingency-specific base URL if available
+	if params.Contingency {
+		if contingencyURL := g.getContingencyBaseURL(params.UF, params.TpAmb); contingencyURL != "" {
+			baseURL = contingencyURL
+		}
+	}
+
 	// Build query parameters
 	values := url.Values{}
 	values.Set("chNFe", params.ChaveAcesso)
@@ -209,6 +241,14 @@ func (g *generator) getBaseURL(uf, tpAmb string) string {
 		}
 	}
 
+	return ""
+}
+
+// getContingencyBaseURL returns contingency-specific base URL for QR codes
+func (g *generator) getContingencyBaseURL(uf, tpAmb string) string {
+	// For most contingency cases, regular URLs still work
+	// Some states may have specific contingency URLs
+	// For now, return empty string to use regular URLs
 	return ""
 }
 

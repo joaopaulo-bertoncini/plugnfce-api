@@ -10,6 +10,7 @@ import (
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/mapper"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/entity"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/ports"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/storage"
 )
 
 // NFCeUseCase defines the interface for NFC-e business logic
@@ -19,6 +20,9 @@ type NFCeUseCase interface {
 	ListNFces(ctx context.Context, limit, offset int) (*dto.NFceListResponse, error)
 	CancelNFce(ctx context.Context, id string, req dto.CancelNFceRequest) error
 	GetNFceEvents(ctx context.Context, requestID string, limit, offset int) (*dto.NFceEventListResponse, error)
+	DownloadXML(ctx context.Context, id string) ([]byte, error)
+	DownloadPDF(ctx context.Context, id string) ([]byte, error)
+	DownloadQRCode(ctx context.Context, id string) ([]byte, error)
 }
 
 // nfceUseCase implements NFCeUseCase
@@ -26,14 +30,16 @@ type nfceUseCase struct {
 	repo      ports.NFCeRepository
 	publisher dto.Publisher
 	mapper    *mapper.NFceMapper
+	storage   storage.StorageService
 }
 
 // NewNFCeUseCase creates a new NFCeUseCase
-func NewNFCeUseCase(repo ports.NFCeRepository, publisher dto.Publisher) NFCeUseCase {
+func NewNFCeUseCase(repo ports.NFCeRepository, publisher dto.Publisher, storage storage.StorageService) NFCeUseCase {
 	return &nfceUseCase{
 		repo:      repo,
 		publisher: publisher,
 		mapper:    mapper.NewNFceMapper(),
+		storage:   storage,
 	}
 }
 
@@ -155,4 +161,95 @@ func (uc *nfceUseCase) GetNFceEvents(ctx context.Context, requestID string, limi
 
 	response := uc.mapper.ToEventResponseList(events)
 	return &response, nil
+}
+
+// DownloadXML downloads the XML file for an NFC-e
+func (uc *nfceUseCase) DownloadXML(ctx context.Context, id string) ([]byte, error) {
+	// Get NFC-e request
+	nfce, err := uc.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get NFC-e: %w", err)
+	}
+
+	// Check if authorized
+	if nfce.Status != entity.RequestStatusAuthorized && nfce.Status != entity.RequestStatusContingency {
+		return nil, errors.New("NFC-e is not authorized")
+	}
+
+	// Check if XML URL exists
+	if nfce.XMLURL == "" {
+		return nil, errors.New("XML file not found")
+	}
+
+	// Extract bucket and key from URL (assuming format: http://minio:9000/bucket/key)
+	// For now, construct the key from the known pattern
+	key := fmt.Sprintf("nfce/%s/xml/%s.xml", nfce.CompanyID, nfce.ChaveAcesso)
+
+	// Download file
+	data, err := uc.storage.DownloadFile(ctx, "", key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download XML file: %w", err)
+	}
+
+	return data, nil
+}
+
+// DownloadPDF downloads the PDF file for an NFC-e
+func (uc *nfceUseCase) DownloadPDF(ctx context.Context, id string) ([]byte, error) {
+	// Get NFC-e request
+	nfce, err := uc.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get NFC-e: %w", err)
+	}
+
+	// Check if authorized
+	if nfce.Status != entity.RequestStatusAuthorized && nfce.Status != entity.RequestStatusContingency {
+		return nil, errors.New("NFC-e is not authorized")
+	}
+
+	// Check if PDF URL exists
+	if nfce.PDFURL == "" {
+		return nil, errors.New("PDF file not found")
+	}
+
+	// Construct the key from the known pattern
+	key := fmt.Sprintf("nfce/%s/pdf/%s.pdf", nfce.CompanyID, nfce.ChaveAcesso)
+
+	// Download file
+	data, err := uc.storage.DownloadFile(ctx, "", key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download PDF file: %w", err)
+	}
+
+	return data, nil
+}
+
+// DownloadQRCode downloads the QR Code image for an NFC-e
+func (uc *nfceUseCase) DownloadQRCode(ctx context.Context, id string) ([]byte, error) {
+	// Get NFC-e request
+	nfce, err := uc.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get NFC-e: %w", err)
+	}
+
+	// Check if authorized
+	if nfce.Status != entity.RequestStatusAuthorized && nfce.Status != entity.RequestStatusContingency {
+		return nil, errors.New("NFC-e is not authorized")
+	}
+
+	// Check if QR Code URL exists
+	if nfce.QRCodeURL == "" {
+		return nil, errors.New("QR Code file not found")
+	}
+
+	// Construct the key from the known pattern
+	key := fmt.Sprintf("nfce/%s/qr/%s.png", nfce.CompanyID, nfce.ChaveAcesso)
+
+	// Download file
+	data, err := uc.storage.DownloadFile(ctx, "", key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download QR Code file: %w", err)
+	}
+
+	return data, nil
 }

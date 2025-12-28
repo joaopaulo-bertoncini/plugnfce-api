@@ -15,9 +15,9 @@ type AppConfig struct {
 	// Database configuration
 	DBHost     string `env:"DB_HOST,default=localhost"`
 	DBPort     string `env:"DB_PORT,default=5432"`
-	DBUser     string `env:"DB_USER,default=imobcheck"`
-	DBPassword string `env:"DB_PASSWORD,default=imobcheck"`
-	DBName     string `env:"DB_NAME,default=imobcheck"`
+	DBUser     string `env:"DB_USER,default=plugnfce"`
+	DBPassword string `env:"DB_PASSWORD,default=plugnfce"`
+	DBName     string `env:"DB_NAME,default=plugnfce"`
 	DBSSLMode  string `env:"DB_SSL_MODE,default=disable"`
 
 	// JWT configuration
@@ -29,7 +29,7 @@ type AppConfig struct {
 	StorageEndpoint  string `env:"STORAGE_ENDPOINT,default=localhost:9000"` // MinIO endpoint or S3 endpoint
 	StorageAccessKey string `env:"STORAGE_ACCESS_KEY,default=minioadmin"`
 	StorageSecretKey string `env:"STORAGE_SECRET_KEY,default=minioadmin"`
-	StorageBucket    string `env:"STORAGE_BUCKET,default=imobcheck-photos"`
+	StorageBucket    string `env:"STORAGE_BUCKET,default=plugnfce"`
 	StorageUseSSL    bool   `env:"STORAGE_USE_SSL,default=false"`
 	StorageBasePath  string `env:"STORAGE_BASE_PATH,default=./uploads"`                      // For local storage
 	StoragePublicURL string `env:"STORAGE_PUBLIC_URL,default=http://localhost:8080/uploads"` // For local storage

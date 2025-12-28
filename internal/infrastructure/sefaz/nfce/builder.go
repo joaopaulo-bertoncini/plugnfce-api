@@ -1,33 +1,44 @@
 package nfe
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/ports"
 )
 
 // Builder handles NFC-e XML construction
 type Builder interface {
-	BuildNFCe(input NFCeInput) (*NFCe, error)
+	BuildNFCe(input NFCeInput, companyID string) (*NFCe, error)
 	GenerateChaveAcesso(uf, cnpj, serie, nNF, tpEmis, cNF string, dhEmi time.Time) (string, error)
 	CalculateDV(chave string) string
 }
 
 // builder implements Builder interface
-type builder struct{}
+type builder struct {
+	companyRepo ports.CompanyRepository
+}
 
 // NewBuilder creates a new NFC-e builder
-func NewBuilder() Builder {
-	return &builder{}
+func NewBuilder(companyRepo ports.CompanyRepository) Builder {
+	return &builder{
+		companyRepo: companyRepo,
+	}
 }
 
 // BuildNFCe builds a complete NFC-e XML from input data
-func (b *builder) BuildNFCe(input NFCeInput) (*NFCe, error) {
-	// Generate sequential number (NNF) - this should come from a sequence
-	nNF := "1" // TODO: implement proper sequencing
+func (b *builder) BuildNFCe(input NFCeInput, companyID string) (*NFCe, error) {
+	// Get next sequential number (NNF) from database
+	nextNumber, err := b.companyRepo.GetNextNFCeNumber(context.Background(), companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get next NFC-e number: %w", err)
+	}
+	nNF := strconv.FormatInt(nextNumber, 10)
 
 	// Generate random number for CNF (8 digits)
-	cNF := "12345678" // TODO: implement proper random generation
+	cNF := b.generateCNF()
 
 	// Generate chave de acesso
 	chave, err := b.GenerateChaveAcesso(
@@ -81,6 +92,16 @@ func (b *builder) buildIde(input NFCeInput, nNF, cNF, chave string) Ide {
 	// Get municipality code based on UF
 	cMunFG := b.getMunicipioFG(input.UF)
 
+	// Determine emission type based on contingency
+	tpEmis := "1" // Normal emission
+	if input.Contingency {
+		if input.ContingencyType == "SVC-AN" {
+			tpEmis = "6" // SVC-AN contingency
+		} else if input.ContingencyType == "SVC-RS" {
+			tpEmis = "7" // SVC-RS contingency
+		}
+	}
+
 	return Ide{
 		CUF:     b.getCUF(input.UF),
 		CNF:     cNF,
@@ -93,7 +114,7 @@ func (b *builder) buildIde(input NFCeInput, nNF, cNF, chave string) Ide {
 		IdDest:  "1", // Interna
 		CmunFG:  cMunFG,
 		TpImp:   "4",                       // DANFE NFC-e
-		TpEmis:  "1",                       // Normal
+		TpEmis:  tpEmis,                    // Normal or contingency
 		Cdv:     b.CalculateDV(chave[:43]), // Last digit of chave
 		TpAmb:   input.Ambiente,
 		ProcEmi: "0", // Emissão própria
@@ -604,4 +625,11 @@ func (b *builder) cleanNumericOnly(s string) string {
 		}
 	}
 	return string(result)
+}
+
+// generateCNF generates a random 8-digit CNF (Código Numérico)
+func (b *builder) generateCNF() string {
+	// Generate random 8-digit number (00000001 to 99999999)
+	// In production, ensure uniqueness within the company for the day
+	return fmt.Sprintf("%08d", time.Now().UnixNano()%99999999+1)
 }

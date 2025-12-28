@@ -2,6 +2,7 @@ package di
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/dto"
@@ -17,6 +18,7 @@ import (
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/signer"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/soap/soapclient"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/validator"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/storage"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/worker"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/pkg/database"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/pkg/logger"
@@ -45,8 +47,42 @@ func InitializeAPIManual(ctx context.Context, cfg *config.AppConfig, l logger.Lo
 	}
 	publisher := dto.Publisher(rabbitmqPublisher)
 
+	// Initialize storage service
+	var storageService storage.StorageService
+	switch cfg.StorageType {
+	case "minio":
+		storageService, err = storage.NewMinIOStorage(
+			cfg.StorageEndpoint,
+			cfg.StorageAccessKey,
+			cfg.StorageSecretKey,
+			cfg.StorageBucket,
+			cfg.StorageUseSSL,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize MinIO storage: %w", err)
+		}
+	case "local":
+		storageService, err = storage.NewLocalStorage(
+			cfg.StorageBasePath,
+			cfg.StoragePublicURL,
+			cfg.StorageBucket,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize local storage: %w", err)
+		}
+	default:
+		storageService, err = storage.NewLocalStorage(
+			cfg.StorageBasePath,
+			cfg.StoragePublicURL,
+			cfg.StorageBucket,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize default storage: %w", err)
+		}
+	}
+
 	// Initialize use cases
-	nfceUseCase := usecase.NewNFCeUseCase(nfceRepo, publisher)
+	nfceUseCase := usecase.NewNFCeUseCase(nfceRepo, publisher, storageService)
 	adminUseCase := usecase.NewAdminUseCase(companyRepo, planRepo, subscriptionRepo)
 	companyUseCase := usecase.NewCompanyUseCase(companyRepo, subscriptionRepo)
 	planUseCase := usecase.NewPlanUseCase(planRepo)
@@ -87,6 +123,7 @@ func InitializeWorkerManual(ctx context.Context, cfg *config.AppConfig, l logger
 
 	// Initialize repositories
 	nfceRepo := postgres.NewNFCeRepository(db)
+	companyRepo := postgres.NewCompanyRepository(db)
 
 	// Initialize messaging
 	rabbitmqPublisher, err := rabbitmq.NewPublisher(cfg.RabbitMQURL)
@@ -101,8 +138,42 @@ func InitializeWorkerManual(ctx context.Context, cfg *config.AppConfig, l logger
 	}
 	consumer := dto.Consumer(rabbitmqConsumer)
 
+	// Initialize storage service
+	var storageService storage.StorageService
+	switch cfg.StorageType {
+	case "minio":
+		storageService, err = storage.NewMinIOStorage(
+			cfg.StorageEndpoint,
+			cfg.StorageAccessKey,
+			cfg.StorageSecretKey,
+			cfg.StorageBucket,
+			cfg.StorageUseSSL,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize MinIO storage: %w", err)
+		}
+	case "local":
+		storageService, err = storage.NewLocalStorage(
+			cfg.StorageBasePath,
+			cfg.StoragePublicURL,
+			cfg.StorageBucket,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize local storage: %w", err)
+		}
+	default:
+		storageService, err = storage.NewLocalStorage(
+			cfg.StorageBasePath,
+			cfg.StoragePublicURL,
+			cfg.StorageBucket,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize default storage: %w", err)
+		}
+	}
+
 	// Initialize SEFAZ components
-	xmlBuilder := nfceInfra.NewBuilder()
+	xmlBuilder := nfceInfra.NewBuilder(companyRepo)
 	xmlSigner := signer.NewSigner()
 	xmlValidator, err := validator.NewXMLValidator("./internal/infrastructure/sefaz/schemas")
 	if err != nil {
@@ -118,6 +189,7 @@ func InitializeWorkerManual(ctx context.Context, cfg *config.AppConfig, l logger
 		xmlValidator,
 		soapClient,
 		qrGenerator,
+		storageService,
 	)
 
 	// Initialize worker

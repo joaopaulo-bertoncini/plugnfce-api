@@ -468,15 +468,17 @@ type InfRespTec struct {
 
 // NFCeInput represents the input data for NFC-e generation
 type NFCeInput struct {
-	UF           string
-	Ambiente     string
-	Emitente     EmitenteInput
-	Destinatario *DestinatarioInput
-	Itens        []ItemInput
-	Pagamentos   []PagamentoInput
-	Transp       TranspInput
-	InfIntermed  *InfIntermedInput
-	InfRespTec   *InfRespTecInput
+	UF              string
+	Ambiente        string
+	Contingency     bool   // Whether to use contingency mode
+	ContingencyType string // "SVC-AN" or "SVC-RS"
+	Emitente        EmitenteInput
+	Destinatario    *DestinatarioInput
+	Itens           []ItemInput
+	Pagamentos      []PagamentoInput
+	Transp          TranspInput
+	InfIntermed     *InfIntermedInput
+	InfRespTec      *InfRespTecInput
 }
 
 // EmitenteInput represents issuer input data

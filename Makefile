@@ -30,6 +30,16 @@ run:
 	@echo "Running $(BINARY_NAME)..."
 	@go run $(MAIN_FILE)
 
+# Executar API
+run-api:
+	@echo "Running API..."
+	@go run cmd/api/main.go
+
+# Executar Worker
+run-worker:
+	@echo "Running Worker..."
+	@go run cmd/worker/main.go
+
 # Executar em modo de desenvolvimento
 dev:
 	@echo "Running in development mode..."
@@ -141,6 +151,8 @@ help:
 	@echo "Development:"
 	@echo "  build         - Build the application"
 	@echo "  run           - Run the application"
+	@echo "  run-api       - Run API server"
+	@echo "  run-worker    - Run worker process"
 	@echo "  dev           - Run in development mode"
 	@echo "  dev-no-db     - Run without database"
 	@echo "  dev-docker    - Run with Docker PostgreSQL"

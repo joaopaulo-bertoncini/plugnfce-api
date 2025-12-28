@@ -67,3 +67,47 @@ func (r *companyRepository) CountByStatus(ctx context.Context, status entity.Com
 	err := r.db.WithContext(ctx).Model(&entity.Company{}).Where("status = ?", status).Count(&count).Error
 	return int(count), err
 }
+
+// GetNextNFCeNumber atomically gets and increments the next NFC-e number for a company
+func (r *companyRepository) GetNextNFCeNumber(ctx context.Context, companyID string) (int64, error) {
+	var nextNumber int64
+
+	// Use a transaction to ensure atomicity
+	tx := r.db.WithContext(ctx).Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if tx.Error != nil {
+		return 0, tx.Error
+	}
+
+	// Get current sequence number
+	var company entity.Company
+	if err := tx.First(&company, "id = ?", companyID).Error; err != nil {
+		tx.Rollback()
+		return 0, err
+	}
+
+	nextNumber = company.UltimoNumeroNFCe + 1
+
+	// Update the sequence
+	if err := tx.Model(&entity.Company{}).Where("id = ?", companyID).Update("ultimo_numero_nfce", nextNumber).Error; err != nil {
+		tx.Rollback()
+		return 0, err
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		return 0, err
+	}
+
+	return nextNumber, nil
+}
+
+// UpdateNFCeSequence updates the NFC-e sequence number for a company (used for rollbacks)
+func (r *companyRepository) UpdateNFCeSequence(ctx context.Context, companyID string, lastNumber int64) error {
+	return r.db.WithContext(ctx).Model(&entity.Company{}).Where("id = ?", companyID).Update("ultimo_numero_nfce", lastNumber).Error
+}

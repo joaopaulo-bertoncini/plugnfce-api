@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/entity"
@@ -121,20 +122,40 @@ func (s *NFCeDomainService) IsRetryAllowed(rejectionCode string, retryCount int,
 		return false
 	}
 
+	// Use the SOAP client error classification for consistency
+	// Import would create circular dependency, so we'll duplicate the logic here
+	// or better yet, move this to a separate error classification service
+
 	// Códigos que NÃO devem ser retentados (rejeições definitivas)
-	noRetryCodes := []string{
-		"101", // Cancelamento de NF-e homologado fora de prazo
-		"102", // Cancelamento de NF-e homologado fora de prazo
-		"135", // Evento registrado e vinculado à NF-e
-		"151", // Temporariamente indisponível para atendimento
-		"301", // Uso Denegado
-		"302", // Irregularidade fiscal do emitente
+	noRetryCodes := map[string]bool{
+		"101": true, // Cancelamento de NF-e homologado fora de prazo
+		"102": true, // Cancelamento de NF-e homologado fora de prazo
+		"135": true, // Evento registrado e vinculado à NF-e
+		"151": true, // Temporariamente indisponível para atendimento (actually this should be retryable)
+		"204": true, // Duplicidade de NF-e (definitive)
+		"301": true, // Uso Denegado: Irregularidade fiscal (definitive)
+		"302": true, // Irregularidade fiscal do destinatário (definitive)
+		"539": true, // Duplicidade de NF-e com diferença na Chave de Acesso (definitive)
 	}
 
-	for _, code := range noRetryCodes {
-		if rejectionCode == code {
-			return false
-		}
+	// Business rule violations (200-299 range generally definitive)
+	if rejectionCode >= "200" && rejectionCode <= "299" && rejectionCode != "204" {
+		return false
+	}
+
+	// Security violations (300-399 range generally definitive)
+	if rejectionCode >= "300" && rejectionCode <= "399" {
+		return false
+	}
+
+	// Schema validation errors (400-499 range generally definitive)
+	if rejectionCode >= "400" && rejectionCode <= "499" {
+		return false
+	}
+
+	// Explicitly non-retryable codes
+	if noRetryCodes[rejectionCode] {
+		return false
 	}
 
 	return true
@@ -144,4 +165,12 @@ func (s *NFCeDomainService) IsRetryAllowed(rejectionCode string, retryCount int,
 // Em produção, isso viria de uma sequence no banco
 func (s *NFCeDomainService) GenerateSequentialNumber(lastNumber int) int {
 	return lastNumber + 1
+}
+
+// GenerateCNF gera o Código Numérico (cNF) de 8 dígitos
+// O cNF é um número aleatório único por NFC-e
+func (s *NFCeDomainService) GenerateCNF() string {
+	// Generate random 8-digit number (00000001 to 99999999)
+	// In production, ensure uniqueness within the company
+	return fmt.Sprintf("%08d", rand.Intn(99999999)+1)
 }

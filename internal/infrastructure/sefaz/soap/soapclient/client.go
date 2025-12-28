@@ -12,9 +12,11 @@ import (
 
 // AuthorizationRequest is the input for SEFAZ authorization.
 type AuthorizationRequest struct {
-	UF       string
-	Ambiente string
-	XML      []byte
+	UF              string
+	Ambiente        string
+	XML             []byte
+	Contingency     bool   // Whether to use contingency mode
+	ContingencyType string // "SVC-AN" or "SVC-RS"
 }
 
 // AuthorizationResponse captures the SEFAZ reply.
@@ -52,9 +54,19 @@ func NewSOAPClient(timeout time.Duration) Client {
 
 // Authorize sends NFC-e authorization request to SEFAZ
 func (c *soapClient) Authorize(ctx context.Context, req AuthorizationRequest) (AuthorizationResponse, error) {
-	endpoint, err := c.getEndpoint(req.UF, req.Ambiente)
-	if err != nil {
-		return AuthorizationResponse{}, fmt.Errorf("failed to get endpoint: %w", err)
+	var endpoint string
+	var err error
+
+	if req.Contingency {
+		endpoint, err = c.getContingencyEndpoint(req.ContingencyType, req.Ambiente)
+		if err != nil {
+			return AuthorizationResponse{}, fmt.Errorf("failed to get contingency endpoint: %w", err)
+		}
+	} else {
+		endpoint, err = c.getEndpoint(req.UF, req.Ambiente)
+		if err != nil {
+			return AuthorizationResponse{}, fmt.Errorf("failed to get endpoint: %w", err)
+		}
 	}
 
 	// Build SOAP envelope
@@ -219,12 +231,70 @@ func (c *soapClient) parseStatusResponse(soapResponse []byte) (AuthorizationResp
 // determineStatus determines the status based on cStat
 func (c *soapClient) determineStatus(cstat string) string {
 	switch cstat {
-	case "100", "101", "102", "103", "104", "105", "106", "107", "108", "109":
+	case "100", "101", "102", "103", "104", "105", "106", "107", "108", "109", "150":
 		return "authorized"
 	case "110", "111", "112", "113", "114", "115", "116", "117", "118", "119":
 		return "denied"
 	default:
 		return "error"
+	}
+}
+
+// IsRetryableError determines if an error is retryable based on cStat
+func IsRetryableError(cstat string) bool {
+	// SEFAZ error codes that indicate transient errors (should be retried)
+	retryableCodes := map[string]bool{
+		// Service temporarily unavailable
+		"108": true, // Serviço Paralisado Temporariamente (SVC)
+		"109": true, // Serviço Paralisado sem Previsão
+
+		// Network/timeout related
+		"500": true, // Erro interno do servidor
+		"503": true, // Serviço temporariamente indisponível
+
+		// Processing errors that might succeed on retry
+		"301": true, // Uso Denegado: Irregularidade fiscal do emitente (temporary block)
+		"302": true, // Irregularidade fiscal do destinatário (temporary)
+
+		// Contingency situations
+		"691": true, // Contingência EPEC: Sistema não autorizado
+		"692": true, // Contingência SVC: Sistema não autorizado
+		"693": true, // Contingência SVC: Autorização não concedida
+
+		// Processing queue full or busy
+		"204": true, // Duplicidade de NF-e (might be timing issue)
+		"539": true, // Duplicidade de NF-e com diferença na Chave de Acesso
+	}
+
+	// Range-based checks for certain error categories
+	if cstat >= "500" && cstat <= "599" {
+		return true // 5xx errors are generally retryable
+	}
+
+	return retryableCodes[cstat]
+}
+
+// GetErrorCategory returns the category of the error for better handling
+func GetErrorCategory(cstat string) string {
+	switch {
+	case cstat == "100" || (cstat >= "101" && cstat <= "109"):
+		return "authorized"
+	case cstat >= "110" && cstat <= "119":
+		return "denied_permanent"
+	case cstat >= "200" && cstat <= "299":
+		return "denied_business_rule"
+	case cstat >= "300" && cstat <= "399":
+		return "denied_security"
+	case cstat >= "400" && cstat <= "499":
+		return "denied_schema"
+	case cstat >= "500" && cstat <= "599":
+		return "error_server"
+	case cstat >= "600" && cstat <= "699":
+		return "error_contingency"
+	case cstat >= "700" && cstat <= "799":
+		return "error_processing"
+	default:
+		return "error_unknown"
 	}
 }
 
@@ -246,6 +316,33 @@ func (c *soapClient) getEndpoint(uf, ambiente string) (string, error) {
 	}
 
 	return endpoint, nil
+}
+
+// getContingencyEndpoint returns the contingency endpoint for SVC-AN or SVC-RS
+func (c *soapClient) getContingencyEndpoint(contingencyType, ambiente string) (string, error) {
+	env := "prod"
+	if ambiente == "2" || ambiente == "homologacao" {
+		env = "hom"
+	}
+
+	switch contingencyType {
+	case "SVC-AN":
+		// SVC-AN (Sistema Virtual de Contingência - Ambiente Nacional)
+		if env == "prod" {
+			return "https://www.svc.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx", nil
+		}
+		return "https://hom.svc.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx", nil
+
+	case "SVC-RS":
+		// SVC-RS (Sistema Virtual de Contingência - Rio Grande do Sul)
+		if env == "prod" {
+			return "https://www.svrs.rs.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx", nil
+		}
+		return "https://hom.svrs.rs.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx", nil
+
+	default:
+		return "", fmt.Errorf("unsupported contingency type: %s", contingencyType)
+	}
 }
 
 // getSEFAZEndpoints returns the SEFAZ endpoints for each UF and environment

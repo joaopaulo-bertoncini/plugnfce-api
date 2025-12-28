@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -20,6 +21,9 @@ type NFCeHandlerInterface interface {
 	ListNFces(c *gin.Context)
 	CancelNFce(c *gin.Context)
 	GetNFceEvents(c *gin.Context)
+	DownloadXML(c *gin.Context)
+	DownloadPDF(c *gin.Context)
+	DownloadQRCode(c *gin.Context)
 }
 
 // NewNFCeHandler creates a new NFCeHandler
@@ -146,4 +150,52 @@ func (h *NFCeHandler) GetNFceEvents(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// DownloadXML downloads the XML file for an NFC-e
+func (h *NFCeHandler) DownloadXML(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	data, err := h.nfceUseCase.DownloadXML(ctx, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Type", "application/xml")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"nfce-%s.xml\"", id))
+	c.Data(http.StatusOK, "application/xml", data)
+}
+
+// DownloadPDF downloads the PDF file for an NFC-e
+func (h *NFCeHandler) DownloadPDF(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	data, err := h.nfceUseCase.DownloadPDF(ctx, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Type", "application/pdf")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"nfce-%s.pdf\"", id))
+	c.Data(http.StatusOK, "application/pdf", data)
+}
+
+// DownloadQRCode downloads the QR Code image for an NFC-e
+func (h *NFCeHandler) DownloadQRCode(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	data, err := h.nfceUseCase.DownloadQRCode(ctx, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Type", "image/png")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"qrcode-%s.png\"", id))
+	c.Data(http.StatusOK, "image/png", data)
 }
