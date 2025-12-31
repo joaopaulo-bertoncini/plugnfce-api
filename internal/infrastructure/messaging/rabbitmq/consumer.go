@@ -31,7 +31,7 @@ func NewConsumer(url string) (dto.Consumer, error) {
 
 	// Declare exchange
 	err = channel.ExchangeDeclare(
-		"nfce_exchange", // name
+		"nfce.exchange", // name
 		"direct",        // type
 		true,            // durable
 		false,           // auto-deleted
@@ -47,12 +47,12 @@ func NewConsumer(url string) (dto.Consumer, error) {
 
 	// Declare queue
 	queue, err := channel.QueueDeclare(
-		"nfce_emit_queue", // name
-		true,              // durable
-		false,             // delete when unused
-		false,             // exclusive
-		false,             // no-wait
-		nil,               // arguments
+		"nfce.emit", // name
+		true,        // durable
+		false,       // delete when unused
+		false,       // exclusive
+		false,       // no-wait
+		nil,         // arguments
 	)
 	if err != nil {
 		channel.Close()
@@ -64,7 +64,7 @@ func NewConsumer(url string) (dto.Consumer, error) {
 	err = channel.QueueBind(
 		queue.Name,      // queue name
 		"nfce.emit",     // routing key
-		"nfce_exchange", // exchange
+		"nfce.exchange", // exchange
 		false,
 		nil,
 	)
@@ -83,13 +83,13 @@ func NewConsumer(url string) (dto.Consumer, error) {
 // ConsumeEmit consumes NFC-e emission messages
 func (c *consumer) ConsumeEmit(ctx context.Context, handler func(context.Context, dto.EmitMessage) error) error {
 	msgs, err := c.channel.Consume(
-		"nfce_emit_queue", // queue
-		"",                // consumer
-		false,             // auto-ack
-		false,             // exclusive
-		false,             // no-local
-		false,             // no-wait
-		nil,               // args
+		"nfce.emit", // queue
+		"",          // consumer
+		false,       // auto-ack
+		false,       // exclusive
+		false,       // no-local
+		false,       // no-wait
+		nil,         // args
 	)
 	if err != nil {
 		return fmt.Errorf("failed to register consumer: %w", err)

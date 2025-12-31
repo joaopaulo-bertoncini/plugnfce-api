@@ -1,9 +1,13 @@
 # Makefile para ImobCheck API
 
 # Variáveis
-BINARY_NAME=plugnfce-api
-BUILD_DIR=/bin
-MAIN_FILE=cmd/api/main.go
+BINARY_API=plugnfce-api
+BUILD_DIR_API=/bin
+MAIN_FILE_API=cmd/api/main.go
+
+BINARY_WORKER=plugnfce-worker
+BUILD_DIR_WORKER=/bin
+MAIN_FILE_WORKER=cmd/worker/main.go
 
 # Database connection variables (use defaults or override from env file)
 DB_HOST ?= localhost
@@ -20,35 +24,35 @@ MIGRATE_CMD = $(HOME)/go/bin/migrate
 .PHONY: build run test clean deps migrate
 
 # Construir a aplicação
-build:
-	@echo "Building $(BINARY_NAME)..."
-	@go build -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_FILE)
-	@echo "Build completed: $(BUILD_DIR)/$(BINARY_NAME)"
+build-api:
+	@echo "Building plugnfce-api..."
+	@go build -o $(BUILD_DIR_API)/$(BINARY_API) $(MAIN_FILE_API)
+	@echo "Build completed: $(BUILD_DIR_API)/$(BINARY_API)"
 
-# Executar a aplicação
-run:
-	@echo "Running $(BINARY_NAME)..."
-	@go run $(MAIN_FILE)
+build-worker:
+	@echo "Building plugnfce-worker..."
+	@go build -o $(BUILD_DIR_WORKER)/$(BINARY_WORKER) $(MAIN_FILE_WORKER)
+	@echo "Build completed: $(BUILD_DIR_WORKER)/$(BINARY_WORKER)"
 
 # Executar API
 run-api:
 	@echo "Running API..."
-	@go run cmd/api/main.go
+	@go run $(MAIN_FILE_API)
 
 # Executar Worker
 run-worker:
 	@echo "Running Worker..."
-	@go run cmd/worker/main.go
+	@go run $(MAIN_FILE_WORKER)
 
 # Executar em modo de desenvolvimento
 dev:
 	@echo "Running in development mode..."
-	@ENV=development go run $(MAIN_FILE)
+	@ENV=development go run $(MAIN_FILE_API)
 
 # Executar sem banco de dados (para testes)
 dev-no-db:
 	@echo "Running in development mode without database..."
-	@ENV=development SKIP_DB=true go run $(MAIN_FILE)
+	@ENV=development SKIP_DB=true go run $(MAIN_FILE_API)
 
 # Executar testes
 test:
@@ -109,11 +113,11 @@ imports:
 # Executar com Docker
 docker-build:
 	@echo "Building Docker image..."
-	@docker build -t $(BINARY_NAME) .
+	@docker build -t $(BINARY_API) -t $(BINARY_WORKER) .
 
 docker-run:
 	@echo "Running with Docker..."
-	@docker run -p 8080:8080 --env-file env $(BINARY_NAME)
+	@docker run -p 8080:8080 --env-file env $(BINARY_API) $(BINARY_WORKER)
 
 # Docker Compose
 docker-up:

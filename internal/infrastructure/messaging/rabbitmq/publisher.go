@@ -81,10 +81,15 @@ func NewPublisher(url string) (dto.Publisher, error) {
 
 // PublishEmit publishes an NFC-e emission message
 func (p *publisher) PublishEmit(ctx context.Context, msg dto.EmitMessage) error {
+	fmt.Printf("DEBUG: Publishing message to nfce.exchange with routing key nfce.emit: %+v\n", msg)
+
 	body, err := json.Marshal(msg)
 	if err != nil {
+		fmt.Printf("DEBUG: Failed to marshal message: %v\n", err)
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
+
+	fmt.Printf("DEBUG: Publishing to exchange nfce.exchange, routing key nfce.emit\n")
 
 	err = p.channel.PublishWithContext(ctx,
 		"nfce.exchange", // exchange
@@ -97,9 +102,11 @@ func (p *publisher) PublishEmit(ctx context.Context, msg dto.EmitMessage) error 
 			DeliveryMode: amqp.Persistent,
 		})
 	if err != nil {
+		fmt.Printf("DEBUG: Failed to publish message: %v\n", err)
 		return fmt.Errorf("failed to publish message: %w", err)
 	}
 
+	fmt.Printf("DEBUG: Message published successfully\n")
 	return nil
 }
 

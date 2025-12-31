@@ -159,64 +159,6 @@ func (w *Worker) handleMessage(ctx context.Context, msg dto.EmitMessage) error {
 	return nil
 }
 
-// processMessage processes a single NFC-e emission message
-func (w *Worker) processMessage(ctx context.Context, msg dto.EmitMessage, log logger.Logger) error {
-	w.logger.Info("Processing NFC-e emission request",
-		logger.Field{Key: "request_id", Value: msg.RequestID},
-		logger.Field{Key: "idempotency_key", Value: msg.IdempotencyKey})
-
-	// Get the NFC-e request from database
-	nfceRequest, err := w.repo.GetByID(ctx, msg.RequestID)
-	if err != nil {
-		return fmt.Errorf("failed to get NFC-e request: %w", err)
-	}
-
-	// Check idempotency - if already processed successfully, skip
-	if nfceRequest.Status == entity.RequestStatusAuthorized {
-		w.logger.Info("NFC-e already authorized, skipping")
-		return nil
-	}
-
-	// Process the NFC-e emission
-	if err := w.workerService.ProcessNFceEmission(ctx, nfceRequest); err != nil {
-		w.logger.Error("NFC-e emission failed", logger.Field{Key: "error", Value: err.Error()})
-
-		// Check if we can retry
-		if w.workerService.CanRetry(nfceRequest, w.maxRetries) {
-			w.scheduleRetry(ctx, nfceRequest)
-			return nil
-		}
-
-		// Mark as rejected if max retries exceeded
-		nfceRequest.MarkAsRejected("999", "Número máximo de tentativas excedido")
-	}
-
-	// Update the request in database
-	if err := w.repo.Update(ctx, nfceRequest); err != nil {
-		return fmt.Errorf("failed to update NFC-e request: %w", err)
-	}
-
-	// Create event for tracking
-	event := &entity.Event{
-		ID:         fmt.Sprintf("%s-%d", nfceRequest.ID, time.Now().Unix()),
-		RequestID:  nfceRequest.ID,
-		StatusFrom: entity.RequestStatusProcessing,
-		StatusTo:   nfceRequest.Status,
-		CStat:      nfceRequest.CStat,
-		Message:    nfceRequest.XMotivo,
-		CreatedAt:  time.Now(),
-	}
-
-	if err := w.repo.CreateEvent(ctx, event); err != nil {
-		w.logger.Error("Failed to create event", logger.Field{Key: "error", Value: err.Error()})
-	}
-
-	w.logger.Info("NFC-e emission completed",
-		logger.Field{Key: "status", Value: string(nfceRequest.Status)})
-
-	return nil
-}
-
 // scheduleRetry schedules a retry for the NFC-e request
 func (w *Worker) scheduleRetry(ctx context.Context, nfceRequest *entity.NFCE) {
 	w.workerService.IncrementRetry(nfceRequest)

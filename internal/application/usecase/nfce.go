@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/dto"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/mapper"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/entity"
@@ -60,22 +59,23 @@ func (uc *nfceUseCase) EmitNFce(ctx context.Context, idempotencyKey string, req 
 		}
 	}
 
-	// Generate new request ID
-	requestID := uuid.New().String()
-
 	// Create request entity (this needs to be refactored to use entity constructors)
 	// TODO: This is still a violation - should use entity.NewRequest() or similar
 	nfceRequest := &entity.Request{
-		ID:             requestID,
 		IdempotencyKey: idempotencyKey,
 		Status:         entity.RequestStatusPending,
 		Payload:        uc.mapper.ToEmitPayload(req),
 	}
+	fmt.Printf("DEBUG: Created nfceRequest with initial ID: %s\n", nfceRequest.ID)
 
 	// Persist request
 	if err := uc.repo.Create(ctx, nfceRequest); err != nil {
 		return nil, fmt.Errorf("failed to create NFC-e request: %w", err)
 	}
+	fmt.Printf("DEBUG: Persisted nfceRequest with final ID: %s\n", nfceRequest.ID)
+
+	// Use the ID assigned by database
+	requestID := nfceRequest.ID
 
 	// Publish to queue for async processing
 	emitMsg := dto.EmitMessage{
@@ -83,11 +83,13 @@ func (uc *nfceUseCase) EmitNFce(ctx context.Context, idempotencyKey string, req 
 		IdempotencyKey: idempotencyKey,
 		EnqueuedAt:     nfceRequest.CreatedAt,
 	}
+	fmt.Printf("DEBUG: Created emitMsg with RequestID: %s\n", emitMsg.RequestID)
 
 	if err := uc.publisher.PublishEmit(ctx, emitMsg); err != nil {
 		// Log error but don't fail the request - it will be retried
 		// TODO: Add proper logging
-		_ = err
+		fmt.Printf("Failed to publish NFC-e message: %v\n", err)
+		return nil, fmt.Errorf("failed to publish NFC-e message: %w", err)
 	}
 
 	response := uc.mapper.ToResponse(nfceRequest)
