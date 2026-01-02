@@ -86,8 +86,64 @@ curl http://localhost:8080/health
 # Generate a unique idempotency key
 IDEMPOTENCY_KEY=$(uuidgen)
 
+# Step 0: Upload Certificate (once per company)
+COMPANY_ID="your-company-id"
+
+# Upload Certificate via File (multipart/form-data)
+curl -X PUT http://localhost:8080/api/v1/companies/$COMPANY_ID/certificate \
+  -F "pfx_file=@certificado.pfx" \
+  -F "password=your_certificate_password" \
+  -F "expires_at=2025-12-31T23:59:59Z"
+
+### Frontend JavaScript Example:
+
+```javascript
+async function uploadCertificate(companyId, pfxFile, password, expiresAt) {
+  const formData = new FormData();
+  formData.append('pfx_file', pfxFile);      // File object from <input type="file">
+  formData.append('password', password);
+  formData.append('expires_at', expiresAt);
+
+  const response = await fetch(`/api/v1/companies/${companyId}/certificate`, {
+    method: 'PUT',
+    body: formData  // Browser sets Content-Type automatically
+  });
+
+  return response.json();
+}
+```
+
+#### HTML Form Example:
+```html
+<form id="certificateForm" enctype="multipart/form-data">
+  <input type="file" id="pfxFile" accept=".pfx,.p12" required>
+  <input type="password" id="password" placeholder="Certificate password" required>
+  <input type="datetime-local" id="expiresAt" required>
+  <button type="submit">Upload Certificate</button>
+</form>
+
+<script>
+document.getElementById('certificateForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const companyId = 'your-company-id';
+  const pfxFile = document.getElementById('pfxFile').files[0];
+  const password = document.getElementById('password').value;
+  const expiresAt = new Date(document.getElementById('expiresAt').value).toISOString();
+
+  try {
+    const result = await uploadCertificate(companyId, pfxFile, password, expiresAt);
+    console.log('Certificate uploaded successfully:', result);
+  } catch (error) {
+    console.error('Upload failed:', error);
+  }
+});
+</script>
+```
+
 # Create NFC-e with test data
-curl -X POST http://localhost:8080/nfce \
+# Note: Certificate is now managed per company, not sent in payload
+curl -X POST http://localhost:8080/api/v1/nfce \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -d '{
@@ -117,10 +173,6 @@ curl -X POST http://localhost:8080/nfce \
         "valor": 29.90
       }
     ],
-    "certificado": {
-      "cert_pfx_b64": "TEST_CERTIFICATE_BASE64_PLACEHOLDER",
-      "cert_password": "test_password"
-    },
     "options": {
       "contingencia": false,
       "sync": false

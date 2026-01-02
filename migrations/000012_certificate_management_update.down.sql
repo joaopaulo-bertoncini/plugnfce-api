@@ -1,0 +1,4 @@
+-- Rollback: Certificate Management Update
+-- Note: This is a documentation-only migration.
+-- No schema changes were made, so no rollback is needed.
+-- The architectural change is backward compatible.

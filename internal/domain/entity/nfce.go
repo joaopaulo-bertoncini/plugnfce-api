@@ -70,13 +70,12 @@ type Payment struct {
 
 // EmitPayload is the normalized payload used to generate the NFC-e XML.
 type EmitPayload struct {
-	UF          string      `json:"uf"`
-	Ambiente    string      `json:"ambiente"`
-	Emitente    Emitente    `json:"emitente"`
-	Itens       []Item      `json:"itens"`
-	Pagamentos  []Payment   `json:"pagamentos"`
-	Certificado Certificate `json:"certificado"`
-	Options     EmitOptions `json:"options"`
+	UF         string      `json:"uf"`
+	Ambiente   string      `json:"ambiente"`
+	Emitente   Emitente    `json:"emitente"`
+	Itens      []Item      `json:"itens"`
+	Pagamentos []Payment   `json:"pagamentos"`
+	Options    EmitOptions `json:"options"`
 }
 
 // Value implements the driver.Valuer interface for GORM JSONB serialization

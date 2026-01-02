@@ -101,14 +101,6 @@ type UpdateCompanyRequest struct {
 	Status            *CompanyStatus `json:"status,omitempty"`
 }
 
-// UpdateCompanyCertificateRequest represents the request to update company certificate
-type UpdateCompanyCertificateRequest struct {
-	Type      CertificateType `json:"type" validate:"required"`
-	PFXData   string          `json:"pfx_data" validate:"required"` // Base64 encoded
-	Password  string          `json:"password" validate:"required"`
-	ExpiresAt time.Time       `json:"expires_at" validate:"required"`
-}
-
 // UpdateCompanyCSCRequest represents the request to update company CSC
 type UpdateCompanyCSCRequest struct {
 	CSCID      string    `json:"csc_id" validate:"required"`

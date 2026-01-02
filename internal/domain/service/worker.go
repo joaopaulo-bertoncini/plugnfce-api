@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/entity"
+	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/domain/ports"
 	nfceInfra "github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/nfce"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/qr"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/infrastructure/sefaz/signer"
@@ -26,6 +27,7 @@ type NFCeWorkerService struct {
 	soapClient   soapclient.Client
 	qrGenerator  qr.Generator
 	storage      storage.StorageService
+	companyRepo  ports.CompanyRepository
 }
 
 // NewNFCeWorkerService creates a new NFC-e worker service
@@ -36,6 +38,7 @@ func NewNFCeWorkerService(
 	soapClient soapclient.Client,
 	qrGenerator qr.Generator,
 	storage storage.StorageService,
+	companyRepo ports.CompanyRepository,
 ) *NFCeWorkerService {
 	return &NFCeWorkerService{
 		xmlBuilder:   xmlBuilder,
@@ -44,6 +47,7 @@ func NewNFCeWorkerService(
 		soapClient:   soapClient,
 		qrGenerator:  qrGenerator,
 		storage:      storage,
+		companyRepo:  companyRepo,
 	}
 }
 
@@ -87,10 +91,15 @@ func (s *NFCeWorkerService) processNFceEmissionWithContingency(ctx context.Conte
 		return fmt.Errorf("XSD validation failed: %w", err)
 	}
 
-	// Step 5: Sign the XML
+	// Step 5: Get certificate from company
+	certificate, err := s.companyRepo.GetCertificateByCompanyID(ctx, nfceRequest.CompanyID)
+	if err != nil {
+		return fmt.Errorf("failed to get certificate for company %s: %w", nfceRequest.CompanyID, err)
+	}
+
 	keyMaterial := signer.KeyMaterial{
-		PFXBase64: nfceRequest.Payload.Certificado.PFXBase64,
-		Password:  nfceRequest.Payload.Certificado.Password,
+		PFXBase64: certificate.PFXBase64,
+		Password:  certificate.Password,
 	}
 
 	// Find the ID of the infNFe element for signing

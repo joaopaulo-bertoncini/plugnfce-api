@@ -81,99 +81,17 @@ API e worker para emissão de NFC-e modelo 65, com fila para retransmissão, est
 10) Persiste status, protocolo, cStat, motivo; salva XML autorizado em S3; (opcional) gera DANFE NFC-e
 11) Dispara webhook/evento se configurado
 
-## Modelagem de dados (PostgreSQL)
-### nfce_requests
-- id (uuid PK)
-- idempotency_key (unique)
-- status: pending | processing | authorized | rejected | contingency | retrying | canceled
-- payload (jsonb)
-- chave_acesso, protocolo
-- rejection_code, rejection_msg
-- retry_count, next_retry_at
-- created_at, updated_at
+## Gestão de Certificados Digitais
 
-### nfce_events
-- id (uuid PK), request_id (fk)
-- status_from, status_to, cstat, message, metadata
-- created_at
+A partir da implementação atual, os certificados digitais são gerenciados da seguinte forma:
 
-Índices: `idempotency_key`, `status`, `next_retry_at`, `chave_acesso`.
+- **Armazenamento**: Certificados são armazenados na tabela `companies` (campos `certificado_pfx_data`, `certificado_password`, etc.)
+- **Transmissão**: Certificados NÃO são enviados na API de emissão NFC-e
+- **Obtenção**: O worker obtém automaticamente o certificado da empresa baseado no `company_id`
+- **Segurança**: Certificados ficam apenas em memória durante processamento, nunca são logados
 
-## Mensagem de fila (JSON)
-{
-  "request_id": "uuid",
-  "idempotency_key": "string",
-  "uf": "SP",
-  "ambiente": "producao|homologacao",
-  "emitente": { "cnpj": "...", "ie": "...", "regime": "simples", "csc_id": "...", "csc_token": "..." },
-  "itens": [ /* produtos, NCM, CFOP, tributos, GTIN */ ],
-  "pagamentos": [ /* formas, troco */ ],
-  "cert_pfx_b64": "...",
-  "cert_password": "...",
-  "options": { "contingencia": false, "sync": true }
-}
-
-## Retransmissão / Retry
-- RabbitMQ: fila principal + DLX; TTL para backoff (p.ex. 1m, 5m, 15m, 1h); cabeçalhos `x-death` para contagem
-- Kafka: tópicos `nfce.emit`, `nfce.retry` (consumidor aplica delay), `nfce.dlt`
-- Regras: erros 5xx/timeout → reenqueue com backoff; erros de regra (cStat rejeição) → não reenqueue, marcar `rejected`
-- Idempotência: checar `idempotency_key` e `request_id`; se já autorizado, não reenviar
-
-## Assinatura XML (Go)
-- Ler PFX/P12 em memória (`crypto/x509`), extrair chave privada + certificado
-- Canonicalização: C14N (sem comentários)
-- Reference: URI `#<ID infNFe>`; Digest SHA1 ou SHA256 conforme schema
-- Transforms: Enveloped Signature + C14N
-- SignatureValue base64; KeyInfo com X509Certificate
-- Bibliotecas úteis: `goxmldsig` (ajustar para enveloped + C14N), `encoding/xml` + `etree` para manipular DOM
-
-## Validação XSD
-- Manter schemas oficiais em `internal/schemas` (sincronizar com sped-nfe)
-- Validação com libxml2 via `github.com/lestrrat-go/libxml2` ou `xmllint` subprocess controlado
-
-## SOAP SEFAZ
-- Endpoints por UF/ambiente (svrs, svrs-hom); montar envelope SOAP 1.2
-- Cliente HTTP com timeout curto e retries com jitter
-- MTOM opcional; caso simples: body XML puro em `NfeAutorizacaoLote`
-
-## QR Code NFC-e v3
-- Seguir NT 2025.001 (versão 3): parâmetros chNFe, tpAmb, cDest (opcional), dhEmi, vNF, vICMS, digVal, CSC/Token
-- Gerar hash (SHA1) do payload + CSC; montar URL da UF
-- Gerar imagem opcional com `github.com/skip2/go-qrcode`
-
-## Contingência
-- Suportar SVC-AN/SVC-RS; marcar status `contingency`
-- Armazenar XML de contingência; tentar normalizar quando comunicação voltar
-
-## Segurança
-- Certificados e senhas apenas em memória; não logar
-- Secrets em Vault/KMS; TLS em todos os hops; WAF/rate-limit na borda
-- Sanitizar payload; não armazenar CSC em texto plano (cripto por KMS)
-
-## Endpoints mínimos (API)
-- `POST /nfce` (idempotência por header)
-- `GET /nfce/{id}` (status + links para XML/PDF)
-- `POST /nfce/{id}/cancel` (evento de cancelamento)
-- `POST /nfce/{id}/email` (opcional)
-
-## Observabilidade
-- Métricas: tempo de montagem, assinatura, latência SEFAZ, taxa de rejeição por cStat, tempo de fila, retries
-- Logs JSON com correlação (`request_id`, `chave_acesso`), sem dados sensíveis
-- Tracing OTel: spans para API, fila, assinatura, validação, SOAP
-
-## Pipeline CI/CD (exemplo GitHub Actions)
-- Jobs Go: lint (golangci-lint), test, build binário
-- Jobs de imagem: build/push (Go worker + API)
-- Scanners: Trivy (imagem/IaC)
-- Deploy: Helm/Kustomize para K8s
-- Migrações DB: `golang-migrate` antes dos deployments
-
-## Passos iniciais de implementação
-1) Definir módulos `nfe` (modelos XML), `signer`, `validator`, `qr`, `soapclient`, `storage`, `queue`, `db`
-2) Baixar XSDs oficiais (referência sped-nfe) para `internal/schemas`
-3) Implementar assinatura XML enveloped (C14N, SHA1/256)
-4) Implementar cliente SOAP para autorização/consulta por UF/ambiente
-5) Implementar QR Code v3 com CSC
-6) Integrar fila + Postgres + storage; idempotência e retries
-7) Testar ponta a ponta em homologação SEFAZ
-8) Instrumentar métricas/logs/tracing
+### Benefícios da Abordagem:
+- ✅ **Segurança**: Certificados não trafegam pela rede
+- ✅ **Performance**: Payloads menores na API
+- ✅ **Gerenciamento**: Ciclo de vida centralizado por empresa
+- ✅ **Auditoria**: Controle de acesso aos certificados

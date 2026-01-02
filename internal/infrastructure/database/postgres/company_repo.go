@@ -87,3 +87,25 @@ func (r *companyRepository) UpdateNFCeSequence(ctx context.Context, companyID st
 	// Update the sequence table directly (for rollbacks or manual adjustments)
 	return r.db.WithContext(ctx).Exec("UPDATE nfce_sequences SET ultimo_numero = ?, updated_at = NOW() WHERE company_id = ?::uuid AND serie = '1'", lastNumber, companyID).Error
 }
+
+// GetCertificateByCompanyID retrieves the certificate for a company
+func (r *companyRepository) GetCertificateByCompanyID(ctx context.Context, companyID string) (*entity.Certificate, error) {
+	var company entity.Company
+	err := r.db.WithContext(ctx).Select("certificado_pfx_data, certificado_password").First(&company, "id = ? AND status = ?", companyID, entity.CompanyStatusActive).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if certificate exists
+	if company.Certificado.PFXData == nil || company.Certificado.Password == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	// Convert bytea to base64 string (assuming it's stored as base64 in the DB)
+	certData := &entity.Certificate{
+		PFXBase64: string(company.Certificado.PFXData),
+		Password:  company.Certificado.Password,
+	}
+
+	return certData, nil
+}

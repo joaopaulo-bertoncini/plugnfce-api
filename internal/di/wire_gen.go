@@ -95,7 +95,8 @@ func InitializeWorker(ctx context.Context, cfg *config.AppConfig, l logger.Logge
 	if err != nil {
 		return nil, err
 	}
-	nfCeWorkerService := service.NewNFCeWorkerService(builder, signer, xmlValidator, client, generator, storageService)
+	companyRepository := postgres.NewCompanyRepository(db)
+	nfCeWorkerService := service.NewNFCeWorkerService(builder, signer, xmlValidator, client, generator, storageService, companyRepository)
 	int2 := provideMaxRetries()
 	workerWorker := worker.NewWorker(nfCeRepository, publisher, consumer, nfCeWorkerService, l, int2)
 	return workerWorker, nil

@@ -17,6 +17,9 @@ type CompanyRepository interface {
 	Count(ctx context.Context) (int, error)
 	CountByStatus(ctx context.Context, status entity.CompanyStatus) (int, error)
 
+	// Certificate methods
+	GetCertificateByCompanyID(ctx context.Context, companyID string) (*entity.Certificate, error)
+
 	// NFC-e sequencing methods
 	GetNextNFCeNumber(ctx context.Context, companyID string) (int64, error)
 	UpdateNFCeSequence(ctx context.Context, companyID string, lastNumber int64) error

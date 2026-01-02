@@ -65,13 +65,12 @@ type Payment struct {
 
 // EmitNFceRequest represents the request to emit a NFC-e
 type EmitNFceRequest struct {
-	UF          string      `json:"uf" binding:"required"`
-	Ambiente    string      `json:"ambiente" binding:"required,oneof=producao homologacao"`
-	Emitente    Emitente    `json:"emitente" binding:"required"`
-	Itens       []Item      `json:"itens" binding:"required,min=1"`
-	Pagamentos  []Payment   `json:"pagamentos" binding:"required,min=1"`
-	Certificado Certificate `json:"certificado" binding:"required"`
-	Options     EmitOptions `json:"options"`
+	UF         string      `json:"uf" binding:"required"`
+	Ambiente   string      `json:"ambiente" binding:"required,oneof=producao homologacao"`
+	Emitente   Emitente    `json:"emitente" binding:"required"`
+	Itens      []Item      `json:"itens" binding:"required,min=1"`
+	Pagamentos []Payment   `json:"pagamentos" binding:"required,min=1"`
+	Options    EmitOptions `json:"options"`
 }
 
 // NFceResponse represents the response containing NFC-e data

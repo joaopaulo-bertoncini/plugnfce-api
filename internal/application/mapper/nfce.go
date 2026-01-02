@@ -51,10 +51,6 @@ func (m *NFceMapper) ToEmitPayload(req dto.EmitNFceRequest) entity.EmitPayload {
 		},
 		Itens:      itens,
 		Pagamentos: pagamentos,
-		Certificado: entity.Certificate{
-			PFXBase64: req.Certificado.PFXBase64,
-			Password:  req.Certificado.Password,
-		},
 		Options: entity.EmitOptions{
 			Contingencia: req.Options.Contingencia,
 			Sync:         req.Options.Sync,

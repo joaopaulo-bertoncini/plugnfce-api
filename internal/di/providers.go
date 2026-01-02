@@ -190,6 +190,7 @@ func InitializeWorkerManual(ctx context.Context, cfg *config.AppConfig, l logger
 		soapClient,
 		qrGenerator,
 		storageService,
+		companyRepo,
 	)
 
 	// Initialize worker

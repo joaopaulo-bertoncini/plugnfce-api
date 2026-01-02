@@ -1,0 +1,16 @@
+-- Migration: Certificate Management Update
+-- Description: Certificates are now managed per company instead of being sent in NFC-e payload
+-- Date: 2025-01-01
+--
+-- Changes:
+-- 1. Certificates are stored in the companies table (certificado_pfx_data, certificado_password, etc.)
+-- 2. NFC-e requests no longer include certificate data in payload
+-- 3. Worker fetches certificate from company record during processing
+--
+-- Benefits:
+-- - Security: Certificates stay in backend, not transmitted over API
+-- - Performance: Smaller payload size, no large certificate data
+-- - Management: Easier certificate lifecycle management per company
+--
+-- Note: The companies table already has certificate fields, so no schema changes needed.
+-- This migration serves as documentation of the architectural change.

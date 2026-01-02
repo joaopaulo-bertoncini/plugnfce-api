@@ -38,6 +38,7 @@ func SetupRoutes(
 		if companyHandler != nil {
 			companies.GET("/profile", companyHandler.GetProfile)
 			companies.PUT("/profile", companyHandler.UpdateProfile)
+			companies.PUT("/:id/certificate", companyHandler.UpdateCertificateByID)
 			companies.PUT("/certificate", companyHandler.UpdateCertificate)
 			companies.PUT("/csc", companyHandler.UpdateCSC)
 		}

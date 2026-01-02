@@ -69,6 +69,7 @@ func InitializeWorker(ctx context.Context, cfg *config.AppConfig, l logger.Logge
 		// Infrastructure
 		provideDatabase,
 		postgres.NewNFCeRepository,
+		postgres.NewCompanyRepository,
 		providePublisher,
 		provideConsumer,
 		provideXMLBuilder,

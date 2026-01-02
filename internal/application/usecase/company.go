@@ -14,7 +14,7 @@ import (
 type CompanyUseCase interface {
 	GetProfile(ctx context.Context, companyID string) (*dto.CompanyDTO, error)
 	UpdateProfile(ctx context.Context, company *dto.CompanyDTO) error
-	UpdateCertificate(ctx context.Context, companyID string, certType *dto.CertificateDTO, pfxData []byte, password string, expiresAt time.Time) error
+	UpdateCertificate(ctx context.Context, companyID string, pfxData []byte, password string, expiresAt time.Time) error
 	UpdateCSC(ctx context.Context, companyID, cscID, cscToken string, validUntil time.Time) error
 }
 
@@ -51,13 +51,13 @@ func (uc *CompanyUseCaseImpl) UpdateProfile(ctx context.Context, company *dto.Co
 }
 
 // UpdateCertificate updates the company certificate
-func (uc *CompanyUseCaseImpl) UpdateCertificate(ctx context.Context, companyID string, certType *dto.CertificateDTO, pfxData []byte, password string, expiresAt time.Time) error {
+func (uc *CompanyUseCaseImpl) UpdateCertificate(ctx context.Context, companyID string, pfxData []byte, password string, expiresAt time.Time) error {
 	company, err := uc.companyRepo.GetByID(ctx, companyID)
 	if err != nil {
 		return err
 	}
 
-	err = company.UpdateCertificate(entity.CertificateType(certType.Type), pfxData, password, expiresAt)
+	err = company.UpdateCertificate(entity.CertificateTypeA1, pfxData, password, expiresAt)
 	if err != nil {
 		return err
 	}
