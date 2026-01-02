@@ -50,13 +50,23 @@ func NewWorker(
 func (w *Worker) Start(ctx context.Context) error {
 	w.logger.Info("Starting NFC-e worker")
 
-	// Start message consumer with handler
+	// Start emit message consumer
 	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
-		err := w.consumer.ConsumeEmit(ctx, w.handleMessage)
+		err := w.consumer.ConsumeEmit(ctx, w.handleEmitMessage)
 		if err != nil && err.Error() != "context canceled" {
-			w.logger.Error("Consumer error", logger.Field{Key: "error", Value: err.Error()})
+			w.logger.Error("Emit consumer error", logger.Field{Key: "error", Value: err.Error()})
+		}
+	}()
+
+	// Start cancel message consumer
+	w.wg.Add(1)
+	go func() {
+		defer w.wg.Done()
+		err := w.consumer.ConsumeCancel(ctx, w.handleCancelMessage)
+		if err != nil && err.Error() != "context canceled" {
+			w.logger.Error("Cancel consumer error", logger.Field{Key: "error", Value: err.Error()})
 		}
 	}()
 
@@ -92,8 +102,8 @@ func (w *Worker) Stop(ctx context.Context) error {
 	}
 }
 
-// handleMessage processes a single message from the queue
-func (w *Worker) handleMessage(ctx context.Context, msg dto.EmitMessage) error {
+// handleEmitMessage processes a single emit message from the queue
+func (w *Worker) handleEmitMessage(ctx context.Context, msg dto.EmitMessage) error {
 	w.logger.Info("Processing NFC-e emission request",
 		logger.Field{Key: "request_id", Value: msg.RequestID},
 		logger.Field{Key: "idempotency_key", Value: msg.IdempotencyKey})
@@ -155,6 +165,67 @@ func (w *Worker) handleMessage(ctx context.Context, msg dto.EmitMessage) error {
 
 	w.logger.Info("NFC-e emission completed",
 		logger.Field{Key: "status", Value: string(nfceRequest.Status)})
+
+	return nil
+}
+
+// handleCancelMessage processes a single cancel message from the queue
+func (w *Worker) handleCancelMessage(ctx context.Context, msg dto.CancelMessage) error {
+	w.logger.Info("Processing NFC-e cancellation request",
+		logger.Field{Key: "request_id", Value: msg.RequestID},
+		logger.Field{Key: "idempotency_key", Value: msg.IdempotencyKey},
+		logger.Field{Key: "justificativa", Value: msg.Justificativa})
+
+	// Get the NFC-e request from database
+	nfceRequest, err := w.repo.GetByID(ctx, msg.RequestID)
+	if err != nil {
+		return fmt.Errorf("failed to get NFC-e request: %w", err)
+	}
+
+	// Check if already canceled
+	if nfceRequest.Status == entity.RequestStatusCanceled {
+		w.logger.Info("NFC-e already canceled, skipping")
+		return nil
+	}
+
+	// Check if can be canceled (must be authorized)
+	if nfceRequest.Status != entity.RequestStatusAuthorized {
+		w.logger.Warn("Cannot cancel NFC-e that is not authorized",
+			logger.Field{Key: "current_status", Value: string(nfceRequest.Status)})
+		return fmt.Errorf("NFC-e must be authorized to be canceled")
+	}
+
+	// Process the NFC-e cancellation
+	if err := w.workerService.ProcessNFceCancellation(ctx, nfceRequest, msg.Justificativa); err != nil {
+		w.logger.Error("NFC-e cancellation failed",
+			logger.Field{Key: "error", Value: err.Error()},
+			logger.Field{Key: "request_id", Value: nfceRequest.ID})
+
+		// For cancellation, we might want to retry on failure
+		return fmt.Errorf("NFC-e cancellation failed: %w", err)
+	}
+
+	// Update the request in database
+	if err := w.repo.Update(ctx, nfceRequest); err != nil {
+		return fmt.Errorf("failed to update NFC-e request: %w", err)
+	}
+
+	// Create event for tracking
+	event := &entity.Event{
+		ID:         fmt.Sprintf("%s-cancel-%d", nfceRequest.ID, time.Now().Unix()),
+		RequestID:  nfceRequest.ID,
+		StatusFrom: entity.RequestStatusAuthorized,
+		StatusTo:   entity.RequestStatusCanceled,
+		Message:    fmt.Sprintf("Cancelado: %s", msg.Justificativa),
+		CreatedAt:  time.Now(),
+	}
+
+	if err := w.repo.CreateEvent(ctx, event); err != nil {
+		w.logger.Error("Failed to create cancel event", logger.Field{Key: "error", Value: err.Error()})
+	}
+
+	w.logger.Info("NFC-e cancellation completed",
+		logger.Field{Key: "request_id", Value: nfceRequest.ID})
 
 	return nil
 }

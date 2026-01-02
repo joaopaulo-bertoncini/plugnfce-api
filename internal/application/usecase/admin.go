@@ -65,7 +65,6 @@ func (uc *AdminUseCaseImpl) CreateCompany(ctx context.Context, req dto.CreateCom
 	company.Email = req.Email
 	company.Endereco = *mapper.NewCompanyMapper().ToAddressEntity(&req.Endereco)
 	company.RegimeTributario = entity.TaxRegime(req.RegimeTributario)
-	company.SerieNFCe = req.SerieNFCe
 
 	err = uc.companyRepo.Create(ctx, company)
 	if err != nil {
@@ -125,9 +124,6 @@ func (uc *AdminUseCaseImpl) UpdateCompany(ctx context.Context, id string, req dt
 	}
 	if req.RegimeTributario != nil {
 		company.RegimeTributario = entity.TaxRegime(*req.RegimeTributario)
-	}
-	if req.SerieNFCe != nil {
-		company.SerieNFCe = *req.SerieNFCe
 	}
 	if req.Status != nil {
 		company.Status = entity.CompanyStatus(*req.Status)

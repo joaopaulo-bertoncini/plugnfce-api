@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/dto"
 	"github.com/joaopaulo-bertoncini/plugnfce-api/internal/application/mapper"
@@ -141,15 +142,28 @@ func (uc *nfceUseCase) CancelNFce(ctx context.Context, id string, req dto.Cancel
 		return errors.New("only authorized NFC-e can be canceled")
 	}
 
-	// Update status to canceled
-	err = uc.repo.UpdateStatus(ctx, id, entity.RequestStatusAuthorized, entity.RequestStatusCanceled, func(r *entity.Request) {
+	// Update status to canceled (temporarily mark as processing for queue)
+	err = uc.repo.UpdateStatus(ctx, id, entity.RequestStatusAuthorized, entity.RequestStatusProcessing, func(r *entity.Request) {
 		// Add cancellation metadata if needed
+		r.XMotivo = req.Justificativa
 	})
 	if err != nil {
-		return fmt.Errorf("failed to cancel NFC-e: %w", err)
+		return fmt.Errorf("failed to update NFC-e status: %w", err)
 	}
 
-	// TODO: Publish cancellation event to queue
+	// Publish cancellation event to queue
+	cancelMsg := dto.CancelMessage{
+		RequestID:      id,
+		IdempotencyKey: nfceReq.IdempotencyKey,
+		Justificativa:  req.Justificativa,
+		EnqueuedAt:     time.Now(),
+	}
+
+	if err := uc.publisher.PublishCancel(ctx, cancelMsg); err != nil {
+		// Revert status if publish fails
+		uc.repo.UpdateStatus(ctx, id, entity.RequestStatusProcessing, entity.RequestStatusAuthorized, func(r *entity.Request) {})
+		return fmt.Errorf("failed to publish cancellation event: %w", err)
+	}
 
 	return nil
 }

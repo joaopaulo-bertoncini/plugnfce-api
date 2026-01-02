@@ -111,6 +111,10 @@ async function uploadCertificate(companyId, pfxFile, password, expiresAt) {
 
   return response.json();
 }
+
+// Note: Company configuration fields removed:
+// - ultimo_numero_nfce (now managed by nfce_sequences table)
+// - serie_atual_nfce (redundant field removed)
 ```
 
 #### HTML Form Example:

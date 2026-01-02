@@ -45,7 +45,7 @@ func NewConsumer(url string) (dto.Consumer, error) {
 		return nil, fmt.Errorf("failed to declare exchange: %w", err)
 	}
 
-	// Declare queue
+	// Declare emit queue
 	queue, err := channel.QueueDeclare(
 		"nfce.emit", // name
 		true,        // durable
@@ -57,10 +57,10 @@ func NewConsumer(url string) (dto.Consumer, error) {
 	if err != nil {
 		channel.Close()
 		conn.Close()
-		return nil, fmt.Errorf("failed to declare queue: %w", err)
+		return nil, fmt.Errorf("failed to declare emit queue: %w", err)
 	}
 
-	// Bind queue to exchange
+	// Bind emit queue to exchange
 	err = channel.QueueBind(
 		queue.Name,      // queue name
 		"nfce.emit",     // routing key
@@ -71,7 +71,36 @@ func NewConsumer(url string) (dto.Consumer, error) {
 	if err != nil {
 		channel.Close()
 		conn.Close()
-		return nil, fmt.Errorf("failed to bind queue: %w", err)
+		return nil, fmt.Errorf("failed to bind emit queue: %w", err)
+	}
+
+	// Declare cancel queue
+	cancelQueue, err := channel.QueueDeclare(
+		"nfce.cancel", // name
+		true,          // durable
+		false,         // delete when unused
+		false,         // exclusive
+		false,         // no-wait
+		nil,           // arguments
+	)
+	if err != nil {
+		channel.Close()
+		conn.Close()
+		return nil, fmt.Errorf("failed to declare cancel queue: %w", err)
+	}
+
+	// Bind cancel queue to exchange
+	err = channel.QueueBind(
+		cancelQueue.Name, // queue name
+		"nfce.cancel",    // routing key
+		"nfce.exchange",  // exchange
+		false,
+		nil,
+	)
+	if err != nil {
+		channel.Close()
+		conn.Close()
+		return nil, fmt.Errorf("failed to bind cancel queue: %w", err)
 	}
 
 	return &consumer{
@@ -132,10 +161,69 @@ func (c *consumer) ConsumeEmit(ctx context.Context, handler func(context.Context
 	}
 }
 
+// ConsumeCancel consumes NFC-e cancellation messages
+func (c *consumer) ConsumeCancel(ctx context.Context, handler func(context.Context, dto.CancelMessage) error) error {
+	msgs, err := c.channel.Consume(
+		"nfce.cancel", // queue
+		"",            // consumer
+		false,         // auto-ack
+		false,         // exclusive
+		false,         // no-local
+		false,         // no-wait
+		nil,           // args
+	)
+	if err != nil {
+		return fmt.Errorf("failed to register cancel consumer: %w", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case d, ok := <-msgs:
+			if !ok {
+				return fmt.Errorf("cancel message channel closed")
+			}
+
+			// Parse message
+			var msg dto.CancelMessage
+			if err := json.Unmarshal(d.Body, &msg); err != nil {
+				log.Printf("Failed to unmarshal cancel message: %v", err)
+				d.Nack(false, false) // Don't requeue invalid messages
+				continue
+			}
+
+			// Handle message
+			if err := handler(ctx, msg); err != nil {
+				log.Printf("Cancel handler error for message %s: %v", msg.RequestID, err)
+				// For cancellation, we might not want to retry as much
+				if shouldRetryCancel(err) {
+					d.Nack(false, true) // Requeue
+				} else {
+					d.Nack(false, false) // Don't requeue
+				}
+				continue
+			}
+
+			// Acknowledge successful processing
+			if err := d.Ack(false); err != nil {
+				log.Printf("Failed to acknowledge cancel message %s: %v", msg.RequestID, err)
+			}
+		}
+	}
+}
+
 // shouldRetry determines if an error should trigger message requeue
 func shouldRetry(err error) bool {
 	// For now, retry all errors. In production, you might want to classify errors
 	// as retryable (temporary failures) vs non-retryable (permanent failures)
+	return true
+}
+
+// shouldRetryCancel determines if a cancel error should trigger message requeue
+func shouldRetryCancel(err error) bool {
+	// For cancellation, be more conservative with retries
+	// since canceling an already canceled NFC-e might not be a problem
 	return true
 }
 

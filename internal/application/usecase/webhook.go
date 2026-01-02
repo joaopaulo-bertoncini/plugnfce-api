@@ -78,8 +78,8 @@ func (uc *WebhookUseCaseImpl) GetByID(ctx context.Context, id string) (*dto.Webh
 
 // List lists webhooks for a company
 func (uc *WebhookUseCaseImpl) List(ctx context.Context, companyID string, limit, offset int) (*dto.WebhookListResponse, error) {
-	// TODO: Filter by companyID when repository supports it
-	webhooks, total, err := uc.webhookRepo.List(ctx, limit, offset)
+	// Filter by companyID
+	webhooks, total, err := uc.webhookRepo.ListByCompanyID(ctx, companyID, limit, offset)
 	if err != nil {
 		return nil, err
 	}

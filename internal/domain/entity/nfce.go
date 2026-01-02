@@ -195,6 +195,15 @@ func (n *NFCE) MarkAsRejected(cstat, xmotivo string) {
 	n.UpdatedAt = now
 }
 
+// MarkAsCanceled marks the NFC-e as canceled
+func (n *NFCE) MarkAsCanceled(justificativa string) {
+	now := time.Now()
+	n.Status = RequestStatusCanceled
+	n.XMotivo = justificativa
+	n.ProcessedAt = &now
+	n.UpdatedAt = now
+}
+
 // MarkAsContingency marks the NFC-e as using contingency
 func (n *NFCE) MarkAsContingency(contingencyType string) {
 	n.Status = RequestStatusContingency

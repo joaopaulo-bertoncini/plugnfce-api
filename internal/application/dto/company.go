@@ -42,7 +42,6 @@ type CompanyDTO struct {
 	Certificado       CertificateDTO `json:"certificado"`
 	CSC               CSCDTO         `json:"csc"`
 	RegimeTributario  TaxRegime      `json:"regime_tributario"`
-	SerieNFCe         string         `json:"serie_nfce"`
 	Status            CompanyStatus  `json:"status"`
 	CreatedAt         time.Time      `json:"created_at"`
 	UpdatedAt         time.Time      `json:"updated_at"`
@@ -87,7 +86,6 @@ type CreateCompanyRequest struct {
 	Email             string     `json:"email" validate:"required,email"`
 	Endereco          AddressDTO `json:"endereco" validate:"required"`
 	RegimeTributario  TaxRegime  `json:"regime_tributario" validate:"required"`
-	SerieNFCe         string     `json:"serie_nfce,omitempty"`
 }
 
 // UpdateCompanyRequest represents the request to update a company
@@ -97,7 +95,6 @@ type UpdateCompanyRequest struct {
 	Email             *string        `json:"email,omitempty"`
 	Endereco          *AddressDTO    `json:"endereco,omitempty"`
 	RegimeTributario  *TaxRegime     `json:"regime_tributario,omitempty"`
-	SerieNFCe         *string        `json:"serie_nfce,omitempty"`
 	Status            *CompanyStatus `json:"status,omitempty"`
 }
 

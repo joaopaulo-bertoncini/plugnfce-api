@@ -56,6 +56,26 @@ func (s *NFCeWorkerService) ProcessNFceEmission(ctx context.Context, nfceRequest
 	return s.processNFceEmissionWithContingency(ctx, nfceRequest, false, "")
 }
 
+// ProcessNFceCancellation handles the complete NFC-e cancellation workflow
+func (s *NFCeWorkerService) ProcessNFceCancellation(ctx context.Context, nfceRequest *entity.NFCE, justificativa string) error {
+	// Update status to canceled
+	nfceRequest.MarkAsCanceled(justificativa)
+
+	// TODO: Implement actual SEFAZ cancellation logic
+	// This would involve:
+	// 1. Building cancellation XML
+	// 2. Signing with certificate
+	// 3. Sending to SEFAZ cancellation endpoint
+	// 4. Processing response
+	// 5. Updating status based on result
+
+	// For now, just mark as canceled
+	// In production, this would call SEFAZ cancellation API
+	fmt.Printf("NFC-e cancellation requested for %s: %s\n", nfceRequest.ID, justificativa)
+
+	return nil
+}
+
 // processNFceEmissionWithContingency handles NFC-e emission with optional contingency
 func (s *NFCeWorkerService) processNFceEmissionWithContingency(ctx context.Context, nfceRequest *entity.NFCE, contingency bool, contingencyType string) error {
 	// Update status to processing

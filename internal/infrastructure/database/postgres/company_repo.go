@@ -68,24 +68,20 @@ func (r *companyRepository) CountByStatus(ctx context.Context, status entity.Com
 	return int(count), err
 }
 
+// Default NFC-e series used by the system
+const defaultNFCeSerie = "1"
+
 // GetNextNFCeNumber atomically gets and increments the next NFC-e number for a company
 func (r *companyRepository) GetNextNFCeNumber(ctx context.Context, companyID string) (int64, error) {
 	var nextNumber int64
 
-	// Use PostgreSQL function for atomic sequence generation
-	err := r.db.WithContext(ctx).Raw("SELECT get_next_nfce_number(?::uuid, '1')", companyID).Scan(&nextNumber).Error
+	// Use PostgreSQL function for atomic sequence generation with default series
+	err := r.db.WithContext(ctx).Raw("SELECT get_next_nfce_number(?::uuid, ?)", companyID, defaultNFCeSerie).Scan(&nextNumber).Error
 	if err != nil {
 		return 0, err
 	}
 
 	return nextNumber, nil
-}
-
-// UpdateNFCeSequence updates the NFC-e sequence number for a company (used for rollbacks)
-// Note: With the new sequence implementation, this is mainly for compatibility and rollbacks
-func (r *companyRepository) UpdateNFCeSequence(ctx context.Context, companyID string, lastNumber int64) error {
-	// Update the sequence table directly (for rollbacks or manual adjustments)
-	return r.db.WithContext(ctx).Exec("UPDATE nfce_sequences SET ultimo_numero = ?, updated_at = NOW() WHERE company_id = ?::uuid AND serie = '1'", lastNumber, companyID).Error
 }
 
 // GetCertificateByCompanyID retrieves the certificate for a company

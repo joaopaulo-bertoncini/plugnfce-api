@@ -85,9 +85,6 @@ func (h *CompanyHandler) UpdateProfile(c *gin.Context) {
 	if req.RegimeTributario != nil {
 		currentProfile.RegimeTributario = *req.RegimeTributario
 	}
-	if req.SerieNFCe != nil {
-		currentProfile.SerieNFCe = *req.SerieNFCe
-	}
 	if req.Status != nil {
 		currentProfile.Status = *req.Status
 	}

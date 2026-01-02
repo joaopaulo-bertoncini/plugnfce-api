@@ -22,7 +22,6 @@ type CompanyRepository interface {
 
 	// NFC-e sequencing methods
 	GetNextNFCeNumber(ctx context.Context, companyID string) (int64, error)
-	UpdateNFCeSequence(ctx context.Context, companyID string, lastNumber int64) error
 }
 
 // PlanRepository defines the persistence boundary for plans.
@@ -52,6 +51,7 @@ type WebhookRepository interface {
 	Update(ctx context.Context, webhook *entity.Webhook) error
 	Delete(ctx context.Context, id string) error
 	List(ctx context.Context, limit, offset int) ([]*entity.Webhook, int, error)
+	ListByCompanyID(ctx context.Context, companyID string, limit, offset int) ([]*entity.Webhook, int, error)
 	Count(ctx context.Context) (int, error)
 }
 

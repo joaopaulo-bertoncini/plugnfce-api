@@ -51,6 +51,19 @@ func (r *webhookRepository) List(ctx context.Context, limit, offset int) ([]*ent
 	return webhooks, int(total), err
 }
 
+func (r *webhookRepository) ListByCompanyID(ctx context.Context, companyID string, limit, offset int) ([]*entity.Webhook, int, error) {
+	var webhooks []*entity.Webhook
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&entity.Webhook{}).Where("company_id = ?", companyID)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.Limit(limit).Offset(offset).Order("created_at DESC").Find(&webhooks).Error
+	return webhooks, int(total), err
+}
+
 func (r *webhookRepository) Count(ctx context.Context) (int, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Model(&entity.Webhook{}).Count(&count).Error
